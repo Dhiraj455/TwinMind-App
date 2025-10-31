@@ -4,12 +4,16 @@ import android.content.Context
 import androidx.room.Room
 import com.example.twinmind2.data.AppDatabase
 import com.example.twinmind2.data.dao.RecordingDao
+import com.example.twinmind2.data.dao.TranscriptDao
 import com.example.twinmind2.recording.RecordingRepository
+import com.example.twinmind2.transcription.TranscriptionApi
+import com.example.twinmind2.transcription.TranscriptionRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import okhttp3.OkHttpClient
 import javax.inject.Singleton
 
 @Module
@@ -26,9 +30,21 @@ object AppModule {
     fun provideRecordingDao(db: AppDatabase): RecordingDao = db.recordingDao()
 
     @Provides
+    fun provideTranscriptDao(db: AppDatabase): TranscriptDao = db.transcriptDao()
+
+    @Provides
     @Singleton
     fun provideRecordingRepository(dao: RecordingDao, @ApplicationContext context: Context): RecordingRepository =
         RecordingRepository(context, dao)
+
+    @Provides
+    @Singleton
+    fun provideTranscriptionRepository(
+        transcriptDao: TranscriptDao,
+        transcriptionApi: TranscriptionApi,
+        @ApplicationContext context: Context,
+        okHttpClient: OkHttpClient
+    ): TranscriptionRepository = TranscriptionRepository(transcriptDao, transcriptionApi, context, okHttpClient)
 }
 
 

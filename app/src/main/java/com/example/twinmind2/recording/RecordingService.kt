@@ -10,6 +10,7 @@ import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import androidx.core.app.NotificationManagerCompat
 import com.example.twinmind2.data.entity.AudioChunk
+import com.example.twinmind2.transcription.TranscriptionRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +28,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class RecordingService : Service() {
     @Inject lateinit var repository: RecordingRepository
+    @Inject lateinit var transcriptionRepository: TranscriptionRepository
 
     private val serviceScope = CoroutineScope(Dispatchers.IO)
     private var sessionId: Long? = null
@@ -180,7 +182,11 @@ class RecordingService : Service() {
                             val file = createChunkFile(sessionId, chunkIndex)
                             writeWav(file, pcmToWrite, sampleRate)
                             val durationMs = elapsedChunkMs + (if (lastOverlap.isNotEmpty()) overlapMs else 0L)
-                            repository.addChunk(sessionId, chunkIndex, file, durationMs)
+                            val chunkId = repository.addChunk(sessionId, chunkIndex, file, durationMs)
+                            
+                            // Enqueue transcription work for this chunk
+                            transcribeChunk(sessionId, chunkId)
+                            
                             // Prepare overlap for next
                             lastOverlap = pcmToWrite.takeLast(overlapBytes).toByteArray()
                             currentChunkPcm = ByteArray(0)
@@ -203,7 +209,10 @@ class RecordingService : Service() {
                     val pcmToWrite = if (lastOverlap.isNotEmpty()) lastOverlap + currentChunkPcm else currentChunkPcm
                     writeWav(file, pcmToWrite, sampleRate)
                     val durationMs = System.currentTimeMillis() - currentChunkStart + (if (lastOverlap.isNotEmpty()) overlapMs else 0L)
-                    repository.addChunk(sessionId, chunkIndex, file, durationMs)
+                    val chunkId = repository.addChunk(sessionId, chunkIndex, file, durationMs)
+                    
+                    // Transcribe final chunk
+                    transcribeChunk(sessionId, chunkId)
                 }
                 audioRecord.stop()
                 audioRecord.release()
@@ -318,6 +327,107 @@ class RecordingService : Service() {
         for (i in 0 until length) sum += buffer[i] * buffer[i].toDouble()
         val mean = sum / length.coerceAtLeast(1)
         return kotlin.math.sqrt(mean).toInt()
+    }
+
+    private fun transcribeChunk(sessionId: Long, chunkId: Long) {
+        android.util.Log.d("RecordingService", "Starting transcription for chunkId=$chunkId, sessionId=$sessionId")
+        println("==========================================")
+        println("📝 STARTING TRANSCRIPTION 📝")
+        println("==========================================")
+        println("Chunk ID: $chunkId")
+        println("Session ID: $sessionId")
+        println("==========================================")
+        
+        serviceScope.launch {
+            try {
+                // Get the chunk from database
+                val chunks = repository.observeChunks(sessionId).first()
+                val chunk = chunks.find { it.id == chunkId }
+                
+                if (chunk == null) {
+                    android.util.Log.e("RecordingService", "Chunk not found: chunkId=$chunkId")
+                    return@launch
+                }
+                
+                android.util.Log.d("RecordingService", "Found chunk: ${chunk.filePath}, exists: ${java.io.File(chunk.filePath).exists()}")
+                
+                // Create pending transcript if it doesn't exist
+                val existingTranscript = transcriptionRepository.getTranscriptForChunk(sessionId, chunkId)
+                if (existingTranscript == null) {
+                    transcriptionRepository.createPendingTranscript(chunk)
+                }
+                
+                // Transcribe with retry logic
+                transcribeWithRetry(sessionId, chunkId, chunk, retryCount = 0)
+                
+            } catch (e: Exception) {
+                android.util.Log.e("RecordingService", "Error in transcription coroutine", e)
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    private suspend fun transcribeWithRetry(
+        sessionId: Long,
+        chunkId: Long,
+        chunk: AudioChunk,
+        retryCount: Int,
+        maxRetries: Int = 3
+    ) {
+        android.util.Log.d("RecordingService", "Transcribing chunk (attempt ${retryCount + 1}/$maxRetries)")
+        
+        val result = transcriptionRepository.transcribeChunk(chunk)
+        
+        result.fold(
+            onSuccess = { text ->
+                android.util.Log.d("RecordingService", "✅ Transcription successful: $text")
+                transcriptionRepository.updateTranscriptSuccess(sessionId, chunkId, text)
+                println("==========================================")
+                println("✅ TRANSCRIPTION SUCCESS ✅")
+                println("==========================================")
+                println("Text: $text")
+                println("==========================================")
+            },
+            onFailure = { error ->
+                android.util.Log.e("RecordingService", "Transcription failed (attempt ${retryCount + 1}/$maxRetries): ${error.message}")
+                
+                if (retryCount < maxRetries) {
+                    val nextRetryCount = retryCount + 1
+                    transcriptionRepository.updateTranscriptFailure(
+                        sessionId,
+                        chunkId,
+                        "Retrying... ($nextRetryCount/$maxRetries): ${error.message}"
+                    )
+                    
+                    // Exponential backoff: 5s, 10s, 20s
+                    val delaySeconds = when (retryCount) {
+                        0 -> 5L
+                        1 -> 10L
+                        2 -> 20L
+                        else -> 30L
+                    }
+                    
+                    android.util.Log.d("RecordingService", "Retrying in ${delaySeconds}s")
+                    delay(delaySeconds * 1000)
+                    
+                    // Retry
+                    transcribeWithRetry(sessionId, chunkId, chunk, nextRetryCount, maxRetries)
+                } else {
+                    // Max retries reached
+                    android.util.Log.e("RecordingService", "❌ Transcription failed after $maxRetries retries")
+                    transcriptionRepository.updateTranscriptFailure(
+                        sessionId,
+                        chunkId,
+                        "Failed after $maxRetries retries: ${error.message}"
+                    )
+                    println("==========================================")
+                    println("❌ TRANSCRIPTION FAILED ❌")
+                    println("==========================================")
+                    println("After $maxRetries retries: ${error.message}")
+                    println("==========================================")
+                }
+            }
+        )
     }
 
     private fun checkStorageSafe(): Boolean {
