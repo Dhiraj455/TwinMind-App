@@ -4,10 +4,12 @@ import android.content.Context
 import androidx.room.Room
 import com.example.twinmind2.data.AppDatabase
 import com.example.twinmind2.data.dao.RecordingDao
+import com.example.twinmind2.data.dao.SummaryDao
 import com.example.twinmind2.data.dao.TranscriptDao
 import com.example.twinmind2.recording.RecordingRepository
 import com.example.twinmind2.transcription.TranscriptionApi
 import com.example.twinmind2.transcription.TranscriptionRepository
+import com.example.twinmind2.summary.SummaryRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -33,6 +35,9 @@ object AppModule {
     fun provideTranscriptDao(db: AppDatabase): TranscriptDao = db.transcriptDao()
 
     @Provides
+    fun provideSummaryDao(db: AppDatabase): SummaryDao = db.summaryDao()
+
+    @Provides
     @Singleton
     fun provideRecordingRepository(dao: RecordingDao, @ApplicationContext context: Context): RecordingRepository =
         RecordingRepository(context, dao)
@@ -45,6 +50,15 @@ object AppModule {
         @ApplicationContext context: Context,
         okHttpClient: OkHttpClient
     ): TranscriptionRepository = TranscriptionRepository(transcriptDao, transcriptionApi, context, okHttpClient)
+
+    @Provides
+    @Singleton
+    fun provideSummaryRepository(
+        summaryDao: SummaryDao,
+        transcriptDao: TranscriptDao,
+        transcriptionApi: TranscriptionApi,
+        @ApplicationContext context: Context
+    ): SummaryRepository = SummaryRepository(context, summaryDao, transcriptDao, transcriptionApi)
 }
 
 

@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.twinmind2.data.entity.AudioChunk
 import com.example.twinmind2.data.entity.RecordingSession
+import com.example.twinmind2.data.entity.Summary
 import com.example.twinmind2.data.entity.Transcript
+import com.example.twinmind2.summary.SummaryRepository
 import com.example.twinmind2.transcription.TranscriptionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
@@ -18,7 +20,8 @@ import javax.inject.Inject
 @HiltViewModel
 class RecordingViewModel @Inject constructor(
     private val repository: RecordingRepository,
-    private val transcriptionRepository: TranscriptionRepository
+    private val transcriptionRepository: TranscriptionRepository,
+    private val summaryRepository: SummaryRepository
 ) : ViewModel() {
 
     val recordingState: StateFlow<RecordingRepository.RecordingUiState> =
@@ -31,6 +34,13 @@ class RecordingViewModel @Inject constructor(
 
     fun transcriptsFor(sessionId: Long): Flow<List<Transcript>> = 
         transcriptionRepository.observeTranscriptsForSession(sessionId)
+
+    fun summaryFor(sessionId: Long): Flow<Summary?> =
+        summaryRepository.observeSummary(sessionId)
+
+    fun generateSummary(sessionId: Long) {
+        summaryRepository.generateSummary(sessionId)
+    }
 }
 
 

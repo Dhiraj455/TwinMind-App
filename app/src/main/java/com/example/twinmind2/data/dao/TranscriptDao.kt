@@ -22,6 +22,9 @@ interface TranscriptDao {
     @Query("SELECT * FROM transcripts WHERE sessionId = :sessionId AND chunkId = :chunkId")
     suspend fun getTranscriptForChunk(sessionId: Long, chunkId: Long): Transcript?
 
+    @Query("SELECT * FROM transcripts WHERE sessionId = :sessionId ORDER BY chunkIndex ASC")
+    suspend fun getTranscriptsForSession(sessionId: Long): List<Transcript>
+
     @Query("SELECT * FROM transcripts WHERE status = 'pending' OR status = 'failed'")
     suspend fun getPendingTranscripts(): List<Transcript>
 
