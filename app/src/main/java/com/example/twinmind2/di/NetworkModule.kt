@@ -6,7 +6,6 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -48,7 +47,9 @@ object NetworkModule {
     
     fun getGeminiApiKey(context: android.content.Context): String {
         // Hardcoded Google Gemini API key
-        val hardcodedApiKey = "AIzaSyB-_4iNctft5afTdptOt6OsXn8DgIQmGko"
+        // IMPORTANT: Replace this with your own Google Gemini API key!
+        // Get a new key from: https://aistudio.google.com/app/apikey
+        val hardcodedApiKey = "YOUR_GOOGLE_GEMINI_API_KEY_HERE"
         
         // Try to get from SharedPreferences first, fallback to hardcoded
         val prefs = context.getSharedPreferences("twinmind_prefs", android.content.Context.MODE_PRIVATE)

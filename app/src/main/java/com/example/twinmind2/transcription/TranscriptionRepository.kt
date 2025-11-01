@@ -79,46 +79,70 @@ class TranscriptionRepository @Inject constructor(
     }
 
     private suspend fun uploadFileToGemini(file: File): String? {
-        return try {
-            // Use OkHttp to upload file via multipart
-            val requestBody = MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("metadata", """{"file":{"display_name":"${file.name}"}}""")
-                .addFormDataPart(
-                    "file",
-                    file.name,
-                    file.asRequestBody("audio/wav".toMediaType())
-                )
-                .build()
+        var attempt = 0
+        val maxRetries = 3
+        
+        while (attempt < maxRetries) {
+            try {
+                // Use OkHttp to upload file via multipart
+                val requestBody = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("metadata", """{"file":{"display_name":"${file.name}"}}""")
+                    .addFormDataPart(
+                        "file",
+                        file.name,
+                        file.asRequestBody("audio/wav".toMediaType())
+                    )
+                    .build()
 
-            val request = Request.Builder()
-                .url("https://generativelanguage.googleapis.com/upload/v1beta/files?key=$apiKey")
-                .post(requestBody)
-                .build()
+                val request = Request.Builder()
+                    .url("https://generativelanguage.googleapis.com/upload/v1beta/files?key=$apiKey")
+                    .post(requestBody)
+                    .build()
 
-            val response = okHttpClient.newCall(request).execute()
-            
-            if (response.isSuccessful) {
-                val responseBody = response.body?.string()
-                android.util.Log.d("TranscriptionRepository", "File upload response: $responseBody")
+                val response = okHttpClient.newCall(request).execute()
                 
-                // Parse response to get file URI
-                val gson = com.google.gson.Gson()
-                val uploadResponse = gson.fromJson(responseBody, Map::class.java)
-                val fileData = uploadResponse["file"] as? Map<*, *>
-                val uri = fileData?.get("uri") as? String
-                
-                android.util.Log.d("TranscriptionRepository", "File uploaded successfully, URI: $uri")
-                uri
-            } else {
-                val errorBody = response.body?.string()
-                android.util.Log.e("TranscriptionRepository", "File upload failed: ${response.code}, $errorBody")
-                null
+                when {
+                    response.isSuccessful -> {
+                        val responseBody = response.body?.string()
+                        android.util.Log.d("TranscriptionRepository", "File upload response: $responseBody")
+                        
+                        // Parse response to get file URI
+                        val gson = com.google.gson.Gson()
+                        val uploadResponse = gson.fromJson(responseBody, Map::class.java)
+                        val fileData = uploadResponse["file"] as? Map<*, *>
+                        val uri = fileData?.get("uri") as? String
+                        
+                        android.util.Log.d("TranscriptionRepository", "File uploaded successfully, URI: $uri")
+                        return uri
+                    }
+                    
+                    response.code == 429 -> {
+                        attempt++
+                        if (attempt >= maxRetries) {
+                            val errorBody = response.body?.string()
+                            android.util.Log.e("TranscriptionRepository", "Rate limit exceeded after $maxRetries attempts")
+                            return null
+                        }
+                        
+                        val delaySeconds = 2L * (1 shl (attempt - 1))
+                        android.util.Log.w("TranscriptionRepository", "Rate limited (429), retrying upload in ${delaySeconds}s (attempt $attempt/$maxRetries)")
+                        kotlinx.coroutines.delay(delaySeconds * 1000)
+                    }
+                    
+                    else -> {
+                        val errorBody = response.body?.string()
+                        android.util.Log.e("TranscriptionRepository", "File upload failed: ${response.code}, $errorBody")
+                        return null
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("TranscriptionRepository", "Error uploading file", e)
+                return null
             }
-        } catch (e: Exception) {
-            android.util.Log.e("TranscriptionRepository", "Error uploading file", e)
-            null
         }
+        
+        return null
     }
 
     private suspend fun generateTranscription(fileUri: String): Result<String> {
