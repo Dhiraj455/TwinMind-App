@@ -48,8 +48,8 @@ object NetworkModule {
     fun getGeminiApiKey(context: android.content.Context): String {
         // Hardcoded Google Gemini API key
         // Get a new key from: https://aistudio.google.com/app/apikey
-//        val hardcodedApiKey = "AIzaSyAkdZYCrY3pRK0my6YmF9MEFlVFQx3iwok"
-        val hardcodedApiKey = "Your_Key"
+        val hardcodedApiKey = "Your_Google_API_Key"
+
         // Try to get from SharedPreferences first, fallback to hardcoded
         val prefs = context.getSharedPreferences("twinmind_prefs", android.content.Context.MODE_PRIVATE)
         val savedKey = prefs.getString("gemini_api_key", "")?.takeIf { it.isNotEmpty() }

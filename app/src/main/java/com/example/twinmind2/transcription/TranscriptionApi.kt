@@ -81,7 +81,6 @@ interface TranscriptionApi {
         val finishReason: String? = null
     )
 
-    // For actual multipart file upload (simpler approach)
     data class TranscriptionResponse(
         val text: String,
         val language: String? = null

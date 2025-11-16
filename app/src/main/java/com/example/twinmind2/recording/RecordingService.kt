@@ -1,5 +1,6 @@
 package com.example.twinmind2.recording
 
+import android.Manifest
 import android.app.Service
 import android.content.Intent
 import android.media.AudioFormat
@@ -8,6 +9,7 @@ import android.media.MediaRecorder
 import android.os.IBinder
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
+import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationManagerCompat
 import com.example.twinmind2.data.entity.AudioChunk
 import com.example.twinmind2.transcription.TranscriptionRepository
@@ -256,6 +258,7 @@ class RecordingService : Service() {
         }
     }
 
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     private fun updateNotification(status: String, elapsed: String = "") {
         val notif = RecordingNotifications.buildRecordingNotification(
             this,
@@ -355,7 +358,7 @@ class RecordingService : Service() {
     private fun transcribeChunk(sessionId: Long, chunkId: Long) {
         android.util.Log.d("RecordingService", "Starting transcription for chunkId=$chunkId, sessionId=$sessionId")
         println("==========================================")
-        println("📝 STARTING TRANSCRIPTION 📝")
+        println("STARTING TRANSCRIPTION")
         println("==========================================")
         println("Chunk ID: $chunkId")
         println("Session ID: $sessionId")
@@ -363,7 +366,6 @@ class RecordingService : Service() {
         
         serviceScope.launch {
             try {
-                // Get the chunk from database
                 val chunks = repository.observeChunks(sessionId).first()
                 val chunk = chunks.find { it.id == chunkId }
                 
@@ -373,14 +375,12 @@ class RecordingService : Service() {
                 }
                 
                 android.util.Log.d("RecordingService", "Found chunk: ${chunk.filePath}, exists: ${java.io.File(chunk.filePath).exists()}")
-                
-                // Create pending transcript if it doesn't exist
+
                 val existingTranscript = transcriptionRepository.getTranscriptForChunk(sessionId, chunkId)
                 if (existingTranscript == null) {
                     transcriptionRepository.createPendingTranscript(chunk)
                 }
-                
-                // Transcribe with retry logic
+
                 transcribeWithRetry(sessionId, chunkId, chunk, retryCount = 0)
                 
             } catch (e: Exception) {
@@ -403,10 +403,10 @@ class RecordingService : Service() {
         
         result.fold(
             onSuccess = { text ->
-                android.util.Log.d("RecordingService", "✅ Transcription successful: $text")
+                android.util.Log.d("RecordingService", "Transcription successful: $text")
                 transcriptionRepository.updateTranscriptSuccess(sessionId, chunkId, text)
                 println("==========================================")
-                println("✅ TRANSCRIPTION SUCCESS ✅")
+                println("TRANSCRIPTION SUCCESS")
                 println("==========================================")
                 println("Text: $text")
                 println("==========================================")
@@ -437,14 +437,14 @@ class RecordingService : Service() {
                     transcribeWithRetry(sessionId, chunkId, chunk, nextRetryCount, maxRetries)
                 } else {
                     // Max retries reached
-                    android.util.Log.e("RecordingService", "❌ Transcription failed after $maxRetries retries")
+                    android.util.Log.e("RecordingService", "Transcription failed after $maxRetries retries")
                     transcriptionRepository.updateTranscriptFailure(
                         sessionId,
                         chunkId,
                         "Failed after $maxRetries retries: ${error.message}"
                     )
                     println("==========================================")
-                    println("❌ TRANSCRIPTION FAILED ❌")
+                    println("TRANSCRIPTION FAILED")
                     println("==========================================")
                     println("After $maxRetries retries: ${error.message}")
                     println("==========================================")

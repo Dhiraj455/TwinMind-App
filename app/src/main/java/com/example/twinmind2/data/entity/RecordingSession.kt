@@ -8,7 +8,7 @@ data class RecordingSession(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val startTimeMs: Long,
     val endTimeMs: Long? = null,
-    val status: String, // active, paused, stopped, error
+    val status: String,
     val title: String? = null,
     val completeAudioPath: String? = null
 )

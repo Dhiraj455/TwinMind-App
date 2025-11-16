@@ -1,7 +1,6 @@
 package com.example.twinmind2.recording
 
 import android.content.Context
-import android.net.Uri
 import com.example.twinmind2.data.dao.RecordingDao
 import com.example.twinmind2.data.entity.AudioChunk
 import com.example.twinmind2.data.entity.RecordingSession
@@ -31,8 +30,6 @@ class RecordingRepository(
         _state.value = _state.value.copy(activeSessionId = id, status = "Recording", elapsedSec = 0, isPaused = false)
         return id
     }
-
-    suspend fun updateSession(session: RecordingSession) = dao.updateSession(session)
 
     suspend fun updateSessionCompleteAudio(sessionId: Long, completeAudioPath: String) {
         val session = dao.getSession(sessionId) ?: return
@@ -65,8 +62,6 @@ class RecordingRepository(
 
     private fun ensureSessionDir(sessionId: Long) { getSessionDir(sessionId) }
 
-    fun getFileUri(file: File): Uri = Uri.fromFile(file)
-
     fun updateElapsed(elapsedSec: Int) {
         _state.value = _state.value.copy(elapsedSec = elapsedSec)
     }
@@ -84,11 +79,8 @@ class RecordingRepository(
     }
 
     suspend fun deleteSession(sessionId: Long) {
-        // Delete chunks first (foreign key constraint)
         dao.deleteChunksForSession(sessionId)
-        // Delete session
         dao.deleteSession(sessionId)
-        // Delete files
         val sessionDir = getSessionDir(sessionId)
         if (sessionDir.exists()) {
             sessionDir.deleteRecursively()

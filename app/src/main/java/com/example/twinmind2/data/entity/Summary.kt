@@ -6,7 +6,7 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "summaries")
 data class Summary(
     @PrimaryKey val sessionId: Long,
-    val status: String = "idle", // idle, generating, completed, failed
+    val status: String = "idle",
     val title: String? = null,
     val summary: String? = null,
     val actionItems: String? = null,

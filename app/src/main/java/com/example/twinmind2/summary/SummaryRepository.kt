@@ -170,9 +170,8 @@ class SummaryRepository @Inject constructor(
             )
         )
 
-        // Retry logic with exponential backoff for rate limiting
         var attempt = 0
-        val maxRetries = 5
+        val maxRetries = 3
         var lastException: Exception? = null
 
         while (attempt < maxRetries) {
@@ -188,15 +187,12 @@ class SummaryRepository @Inject constructor(
                 }
                 
                 response.code() == 429 -> {
-                    // Rate limit - retry with exponential backoff
                     attempt++
                     if (attempt >= maxRetries) {
                         val errorBody = response.errorBody()?.string()
                         Log.e("SummaryRepository", "Rate limit exceeded after $maxRetries attempts: body=$errorBody")
                         throw Exception("Rate limit exceeded. Please try again in a few minutes.")
                     }
-                    
-                    // Exponential backoff: 2, 4, 8, 16, 32 seconds
                     val delaySeconds = 2L * (1 shl (attempt - 1))
                     Log.w("SummaryRepository", "Rate limited (429), retrying in ${delaySeconds}s (attempt $attempt/$maxRetries)")
                     kotlinx.coroutines.delay(delaySeconds * 1000)
@@ -204,15 +200,12 @@ class SummaryRepository @Inject constructor(
                 }
                 
                 else -> {
-                    // Other error - don't retry
                     val errorBody = response.errorBody()?.string()
                     Log.e("SummaryRepository", "Gemini summary API error: code=${response.code()} body=$errorBody")
                     throw Exception("Failed to generate summary: ${response.message()}")
                 }
             }
         }
-        
-        // Shouldn't reach here, but handle it anyway
         throw lastException ?: Exception("Failed to generate summary after $maxRetries attempts")
     }
 }

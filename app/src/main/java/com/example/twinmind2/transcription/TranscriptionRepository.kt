@@ -13,8 +13,6 @@ import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
-import okhttp3.RequestBody.Companion.toRequestBody
-import retrofit2.Response
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -26,7 +24,6 @@ class TranscriptionRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val okHttpClient: OkHttpClient
 ) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("twinmind_prefs", Context.MODE_PRIVATE)
     private val apiKey = NetworkModule.getGeminiApiKey(context)
     fun observeTranscriptsForSession(sessionId: Long): Flow<List<Transcript>> =
         transcriptDao.observeTranscriptsForSession(sessionId)
@@ -55,7 +52,7 @@ class TranscriptionRepository @Inject constructor(
 
             android.util.Log.d("TranscriptionRepository", "Calling Google Gemini 2.5 Flash transcription API")
             println("==========================================")
-            println("📞 CALLING GOOGLE GEMINI API 📞")
+            println("CALLING GOOGLE GEMINI API")
             println("==========================================")
             println("File: ${file.name}, Size: ${file.length()} bytes")
             println("Model: gemini-2.0-flash-exp")
@@ -161,7 +158,6 @@ class TranscriptionRepository @Inject constructor(
                 contents = listOf(
                     TranscriptionApi.Content(
                         parts = listOf(
-                            // First part: the audio file
                             TranscriptionApi.Part(
                                 file_data = TranscriptionApi.FileData(
                                     file_uri = fileUri,
@@ -169,7 +165,6 @@ class TranscriptionRepository @Inject constructor(
                                 ),
                                 text = null
                             ),
-                            // Second part: the transcription instruction
                             TranscriptionApi.Part(
                                 file_data = null,
                                 text = "Transcribe this audio file into text. Return only the transcription without any additional commentary."
@@ -200,7 +195,7 @@ class TranscriptionRepository @Inject constructor(
                         
                         android.util.Log.d("TranscriptionRepository", "Transcription result: $transcriptText")
                         println("==========================================")
-                        println("✅ GOOGLE GEMINI API RESPONSE RECEIVED ✅")
+                        println("GOOGLE GEMINI API RESPONSE RECEIVED")
                         println("==========================================")
                         println("Transcription Text: $transcriptText")
                         println("==========================================")
@@ -250,7 +245,7 @@ class TranscriptionRepository @Inject constructor(
                 }
                 
                 println("==========================================")
-                println("❌ GOOGLE GEMINI API ERROR ❌")
+                println("GOOGLE GEMINI API ERROR")
                 println("==========================================")
                 println("Code: ${response.code()}")
                 println("Error: $errorMessage")
