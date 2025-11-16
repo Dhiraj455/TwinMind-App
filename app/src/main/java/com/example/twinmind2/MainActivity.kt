@@ -170,23 +170,6 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(Unit) { RecordingNotifications.ensureChannels(this@MainActivity) }
     }
 
-    @Composable
-    private fun SessionChunksList(sessionId: Long, vm: RecordingViewModel) {
-        val chunks = vm.chunksFor(sessionId).collectAsState(initial = emptyList())
-        if (chunks.value.isNotEmpty()) {
-            Text("Chunks:", modifier = Modifier.padding(start = 8.dp, top = 8.dp))
-        }
-        chunks.value.forEach { chunk ->
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = " - Chunk ${chunk.indexInSession} • ${chunk.durationMs}ms\n   ${chunk.filePath}",
-                modifier = Modifier
-                    .clickable { openAudio(chunk.filePath) }
-                    .padding(start = 8.dp)
-            )
-        }
-    }
-
     private fun openAudio(path: String) {
         try {
             val file = java.io.File(path)
