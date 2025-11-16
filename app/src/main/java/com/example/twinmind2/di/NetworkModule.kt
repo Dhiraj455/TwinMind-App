@@ -47,7 +47,6 @@ object NetworkModule {
     
     fun getGeminiApiKey(context: android.content.Context): String {
         // Hardcoded Google Gemini API key
-        // IMPORTANT: Replace this with your own Google Gemini API key!
         // Get a new key from: https://aistudio.google.com/app/apikey
         val hardcodedApiKey = "YOUR_GOOGLE_GEMINI_API_KEY_HERE"
         

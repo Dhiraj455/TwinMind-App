@@ -34,6 +34,8 @@ class RecordingService : Service() {
     private var sessionId: Long? = null
     private var isPaused: Boolean = false
     private var startElapsedMs: Long = 0
+    private var pauseStartMs: Long = 0
+    private var totalPausedMs: Long = 0
     private var timerJob: Job? = null
     private var recordJob: Job? = null
     @Volatile private var requestedStop: Boolean = false
@@ -42,10 +44,17 @@ class RecordingService : Service() {
     private val phoneListener = object : PhoneStateListener() {
         override fun onCallStateChanged(state: Int, phoneNumber: String?) {
             if (state != TelephonyManager.CALL_STATE_IDLE) {
+                if (!isPaused) {
+                    pauseStartMs = System.currentTimeMillis()
+                }
                 isPaused = true
                 repository.setPaused(true, "Paused - Phone call")
                 updateNotification("Paused - Phone call")
             } else if (state == TelephonyManager.CALL_STATE_IDLE) {
+                if (isPaused && pauseStartMs > 0) {
+                    totalPausedMs += System.currentTimeMillis() - pauseStartMs
+                    pauseStartMs = 0
+                }
                 isPaused = false
                 repository.setPaused(false, "Recording")
                 updateNotification("Recording")
@@ -63,12 +72,19 @@ class RecordingService : Service() {
                 return START_STICKY
             }
             RecordingNotifications.ACTION_PAUSE -> {
+                if (!isPaused) {
+                    pauseStartMs = System.currentTimeMillis()
+                }
                 isPaused = true
                 repository.setPaused(true, "Paused")
                 updateNotification("Paused")
                 return START_STICKY
             }
             RecordingNotifications.ACTION_RESUME -> {
+                if (isPaused && pauseStartMs > 0) {
+                    totalPausedMs += System.currentTimeMillis() - pauseStartMs
+                    pauseStartMs = 0
+                }
                 isPaused = false
                 repository.setPaused(false, "Recording")
                 updateNotification("Recording")
@@ -107,6 +123,8 @@ class RecordingService : Service() {
             val newSessionId = repository.startSession()
             sessionId = newSessionId
             startElapsedMs = System.currentTimeMillis()
+            totalPausedMs = 0
+            pauseStartMs = 0
             startTimer()
             doRecordLoop(newSessionId)
         }
@@ -116,7 +134,12 @@ class RecordingService : Service() {
         timerJob?.cancel()
         timerJob = serviceScope.launch(Dispatchers.Default) {
             while (isActive) {
-                val elapsed = ((System.currentTimeMillis() - startElapsedMs) / 1000).toInt()
+                val currentPausedTime = if (isPaused && pauseStartMs > 0) {
+                    System.currentTimeMillis() - pauseStartMs
+                } else {
+                    0
+                }
+                val elapsed = ((System.currentTimeMillis() - startElapsedMs - totalPausedMs - currentPausedTime) / 1000).toInt()
                 val mm = (elapsed / 60).toString().padStart(2, '0')
                 val ss = (elapsed % 60).toString().padStart(2, '0')
                 repository.updateElapsed(elapsed)
