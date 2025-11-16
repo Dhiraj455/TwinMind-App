@@ -3,7 +3,7 @@
 ## Watch Demo
 
 Watch the demo video on Google Drive:  
-[▶️ View TwinMind2 Demo](https://drive.google.com/file/d/12pb92UjpsNAI3jlkbQwBikXxAnGmmOrH/view?usp=drivesdk)
+[▶️ View TwinMind2 Demo](https://drive.google.com/file/d/17TgETsyeqQO-A7AbM3sUfH-vCQIIVJWr/view?usp=drivesdk)
 
 An intelligent Android meeting recorder application powered by Google Gemini AI that provides real-time transcription, intelligent summaries, and comprehensive meeting insights.
 
