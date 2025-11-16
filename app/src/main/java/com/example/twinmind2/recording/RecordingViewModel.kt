@@ -10,6 +10,7 @@ import com.example.twinmind2.summary.SummaryRepository
 import com.example.twinmind2.transcription.TranscriptionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
@@ -28,11 +29,12 @@ class RecordingViewModel @Inject constructor(
         repository.state.stateIn(viewModelScope, SharingStarted.Eagerly, repository.state.value)
 
     val sessions: StateFlow<List<RecordingSession>> =
-        repository.observeSessions().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        repository.observeSessions()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun chunksFor(sessionId: Long): Flow<List<AudioChunk>> = repository.observeChunks(sessionId)
 
-    fun transcriptsFor(sessionId: Long): Flow<List<Transcript>> = 
+    fun transcriptsFor(sessionId: Long): Flow<List<Transcript>> =
         transcriptionRepository.observeTranscriptsForSession(sessionId)
 
     fun summaryFor(sessionId: Long): Flow<Summary?> =
@@ -40,6 +42,12 @@ class RecordingViewModel @Inject constructor(
 
     fun generateSummary(sessionId: Long) {
         summaryRepository.generateSummary(sessionId)
+    }
+
+    fun deleteSession(sessionId: Long) {
+        viewModelScope.launch {
+            repository.deleteSession(sessionId)
+        }
     }
 }
 

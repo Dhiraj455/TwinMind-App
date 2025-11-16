@@ -82,6 +82,18 @@ class RecordingRepository(
     fun clearActive() {
         _state.value = RecordingUiState()
     }
+
+    suspend fun deleteSession(sessionId: Long) {
+        // Delete chunks first (foreign key constraint)
+        dao.deleteChunksForSession(sessionId)
+        // Delete session
+        dao.deleteSession(sessionId)
+        // Delete files
+        val sessionDir = getSessionDir(sessionId)
+        if (sessionDir.exists()) {
+            sessionDir.deleteRecursively()
+        }
+    }
 }
 
 

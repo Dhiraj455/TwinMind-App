@@ -28,6 +28,12 @@ interface RecordingDao {
 
     @Query("SELECT * FROM audio_chunks WHERE sessionId = :sessionId ORDER BY indexInSession ASC")
     fun observeChunks(sessionId: Long): Flow<List<AudioChunk>>
+
+    @Query("DELETE FROM recording_sessions WHERE id = :sessionId")
+    suspend fun deleteSession(sessionId: Long)
+
+    @Query("DELETE FROM audio_chunks WHERE sessionId = :sessionId")
+    suspend fun deleteChunksForSession(sessionId: Long)
 }
 
 

@@ -130,6 +130,16 @@ class TranscriptionRepository @Inject constructor(
                         kotlinx.coroutines.delay(delaySeconds * 1000)
                     }
                     
+                    response.code == 403 -> {
+                        val errorBody = response.body?.string()
+                        android.util.Log.e("TranscriptionRepository", "File upload failed (403): $errorBody")
+                        // Check if it's a quota error
+                        if (errorBody?.contains("quota", ignoreCase = true) == true) {
+                            android.util.Log.e("TranscriptionRepository", "Quota exceeded - user needs to enable billing or wait for quota allocation")
+                        }
+                        return null
+                    }
+                    
                     else -> {
                         val errorBody = response.body?.string()
                         android.util.Log.e("TranscriptionRepository", "File upload failed: ${response.code}, $errorBody")
@@ -211,11 +221,29 @@ class TranscriptionRepository @Inject constructor(
                     val gson = com.google.gson.Gson()
                     val errorJson = gson.fromJson(errorBody, Map::class.java)
                     val errorObj = errorJson["error"] as? Map<*, *>
-                    errorObj?.get("message") as? String ?: "Unknown error"
+                    val message = errorObj?.get("message") as? String ?: "Unknown error"
+                    
+                    // Check for quota exceeded errors
+                    if (message.contains("quota", ignoreCase = true) || 
+                        message.contains("exceeded", ignoreCase = true) ||
+                        message.contains("limit: 0", ignoreCase = true)) {
+                        "Quota exceeded: Your Google Gemini API key has no quota allocated. " +
+                        "Please enable billing in Google Cloud Console or wait for quota allocation. " +
+                        "Visit: https://aistudio.google.com/app/apikey to check your quota."
+                    } else {
+                        message
+                    }
                 } catch (e: Exception) {
                     when (response.code()) {
-                        401 -> "Invalid API key. Please check your Google Gemini API key."
-                        403 -> "Access forbidden. Check your API key permissions."
+                        401 -> "Invalid API key. Please check your Google Gemini API key at https://aistudio.google.com/app/apikey"
+                        403 -> {
+                            if (errorBody.contains("quota", ignoreCase = true)) {
+                                "Quota exceeded: Enable billing in Google Cloud Console or wait for quota allocation. " +
+                                "Visit: https://console.cloud.google.com/apis/api/generativelanguage.googleapis.com/quotas"
+                            } else {
+                                "Access forbidden. Check your API key permissions and enable the Gemini API in Google Cloud Console."
+                            }
+                        }
                         429 -> "Rate limit exceeded. Please wait before retrying."
                         else -> "API error: ${response.code()} - ${response.message()}"
                     }
