@@ -30,16 +30,18 @@ fun SummaryScreen(sessionId: Long, navController: NavController) {
     val scrollState = rememberScrollState()
 
     Scaffold(
+        containerColor = Color(0xFFF5F5F5),
         topBar = {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "📄 Summary",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp
+                    fontSize = 20.sp,
+                    color = Color.Black
                 )
                 Text(
                     text = "Session #$sessionId",
-                    fontSize = 16.sp,
+                    fontSize = 14.sp,
                     color = Color.Gray
                 )
             }
@@ -56,6 +58,7 @@ fun SummaryScreen(sessionId: Long, navController: NavController) {
                 null, "idle" -> {
                     Text(
                         text = "No summary generated yet.",
+                        fontSize = 14.sp,
                         color = Color.Gray,
                         modifier = Modifier.padding(8.dp)
                     )
@@ -68,6 +71,7 @@ fun SummaryScreen(sessionId: Long, navController: NavController) {
                 "generating" -> {
                     Text(
                         text = "Generating summary... (${summary.sectionsCompleted}/4 sections ready)",
+                        fontSize = 14.sp,
                         color = Color.Gray,
                         modifier = Modifier.padding(8.dp)
                     )
@@ -78,6 +82,7 @@ fun SummaryScreen(sessionId: Long, navController: NavController) {
                 "failed" -> {
                     Text(
                         text = summary.errorMessage ?: "Failed to generate summary.",
+                        fontSize = 14.sp,
                         color = Color(0xFFE53935),
                         modifier = Modifier.padding(8.dp)
                     )
@@ -143,7 +148,9 @@ private fun SummarySectionContent(
 ) {
     Text(
         text = heading,
-        fontWeight = FontWeight.SemiBold,
+        fontSize = 16.sp,
+        fontWeight = FontWeight.Bold,
+        color = Color.Black,
         modifier = Modifier.padding(start = 8.dp, top = 8.dp)
     )
     Spacer(Modifier.height(4.dp))
@@ -151,12 +158,14 @@ private fun SummarySectionContent(
     when {
         isLoading -> Text(
             text = "Loading...",
+            fontSize = 14.sp,
             color = Color.Gray,
             modifier = Modifier.padding(start = 12.dp)
         )
 
         content.isNullOrBlank() -> Text(
             text = "Not available",
+            fontSize = 14.sp,
             color = Color.Gray,
             modifier = Modifier.padding(start = 12.dp)
         )
@@ -168,17 +177,29 @@ private fun SummarySectionContent(
                 .filter { it.isNotBlank() }
 
             if (items.isEmpty()) {
-                Text(text = content, modifier = Modifier.padding(start = 12.dp))
+                Text(
+                    text = content,
+                    fontSize = 14.sp,
+                    color = Color.Black,
+                    modifier = Modifier.padding(start = 12.dp)
+                )
             } else {
                 items.forEach { item ->
                     Text(
                         text = "• $item",
+                        fontSize = 14.sp,
+                        color = Color.Black,
                         modifier = Modifier.padding(start = 16.dp, bottom = 2.dp)
                     )
                 }
             }
         }
 
-        else -> Text(text = content, modifier = Modifier.padding(start = 12.dp))
+        else -> Text(
+            text = content,
+            fontSize = 14.sp,
+            color = Color.Black,
+            modifier = Modifier.padding(start = 12.dp)
+        )
     }
 }

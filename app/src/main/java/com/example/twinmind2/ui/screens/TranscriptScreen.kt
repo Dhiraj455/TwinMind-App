@@ -28,16 +28,18 @@ fun TranscriptScreen(sessionId: Long, navController: NavController) {
     val scrollState = rememberScrollState()
 
     Scaffold(
+        containerColor = Color(0xFFF5F5F5),
         topBar = {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "📝 Transcript",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp
+                    fontSize = 20.sp,
+                    color = Color.Black
                 )
                 Text(
                     text = "Session #$sessionId",
-                    fontSize = 16.sp,
+                    fontSize = 14.sp,
                     color = Color.Gray
                 )
             }
@@ -54,6 +56,7 @@ fun TranscriptScreen(sessionId: Long, navController: NavController) {
                 Text(
                     text = "No transcripts yet. Transcription starts automatically when chunks are created.",
                     modifier = Modifier.padding(8.dp),
+                    fontSize = 14.sp,
                     color = Color.Gray
                 )
             } else {
@@ -64,6 +67,7 @@ fun TranscriptScreen(sessionId: Long, navController: NavController) {
                             "pending" -> {
                                 Text(
                                     text = "⏳ Chunk ${transcript.chunkIndex}: Transcribing...",
+                                    fontSize = 14.sp,
                                     color = Color(0xFF9E9E9E)
                                 )
                             }
@@ -71,6 +75,8 @@ fun TranscriptScreen(sessionId: Long, navController: NavController) {
                             "failed" -> {
                                 Text(
                                     text = "❌ Chunk ${transcript.chunkIndex}: Failed",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
                                     color = Color(0xFFE53935)
                                 )
                                 transcript.errorMessage?.let {
@@ -85,18 +91,22 @@ fun TranscriptScreen(sessionId: Long, navController: NavController) {
                             "completed" -> {
                                 Text(
                                     text = "✓ Chunk ${transcript.chunkIndex}:",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
                                     color = Color(0xFF4CAF50)
                                 )
                                 Spacer(Modifier.height(4.dp))
                                 Text(
                                     text = transcript.text,
-                                    fontSize = 14.sp
+                                    fontSize = 14.sp,
+                                    color = Color.Black
                                 )
                             }
 
                             else -> {
                                 Text(
                                     text = "• Chunk ${transcript.chunkIndex}: ${transcript.status}",
+                                    fontSize = 14.sp,
                                     color = Color.Gray
                                 )
                             }
@@ -111,14 +121,16 @@ fun TranscriptScreen(sessionId: Long, navController: NavController) {
                     Text(
                         text = "📄 Complete Transcript:",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
+                        fontSize = 18.sp,
+                        color = Color.Black
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = transcripts.value.sortedBy { it.chunkIndex }
                             .joinToString(" ") { it.text },
-                        fontSize = 15.sp,
-                        lineHeight = 22.sp
+                        fontSize = 14.sp,
+                        color = Color.Black,
+                        lineHeight = 20.sp
                     )
                 } else {
                     val completedCount =
