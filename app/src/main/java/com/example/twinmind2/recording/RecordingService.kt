@@ -3,9 +3,13 @@ package com.example.twinmind2.recording
 import android.Manifest
 import android.app.Service
 import android.content.Intent
+import android.media.AudioAttributes
 import android.media.AudioFormat
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.os.Build
 import android.os.IBinder
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
@@ -35,6 +39,7 @@ class RecordingService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO)
     private var sessionId: Long? = null
     private var isPaused: Boolean = false
+    private var pausedForAudioFocus: Boolean = false
     private var startElapsedMs: Long = 0
     private var pauseStartMs: Long = 0
     private var totalPausedMs: Long = 0
@@ -50,6 +55,7 @@ class RecordingService : Service() {
                     pauseStartMs = System.currentTimeMillis()
                 }
                 isPaused = true
+                pausedForAudioFocus = false
                 repository.setPaused(true, "Paused - Phone call")
                 updateNotification("Paused - Phone call")
             } else if (state == TelephonyManager.CALL_STATE_IDLE) {
@@ -58,8 +64,41 @@ class RecordingService : Service() {
                     pauseStartMs = 0
                 }
                 isPaused = false
+                pausedForAudioFocus = false
                 repository.setPaused(false, "Recording")
                 updateNotification("Recording")
+            }
+        }
+    }
+
+    private var audioManager: AudioManager? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
+    private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+        when (focusChange) {
+            AudioManager.AUDIOFOCUS_LOSS,
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                // Pause due to audio focus loss, but don't override phone-call pause
+                if (!isPaused) {
+                    pauseStartMs = System.currentTimeMillis()
+                    isPaused = true
+                    pausedForAudioFocus = true
+                    repository.setPaused(true, "Paused - Audio focus lost")
+                    updateNotification("Paused - Audio focus lost")
+                }
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                // Resume only if we paused specifically for audio focus
+                if (isPaused && pausedForAudioFocus) {
+                    if (pauseStartMs > 0) {
+                        totalPausedMs += System.currentTimeMillis() - pauseStartMs
+                        pauseStartMs = 0
+                    }
+                    isPaused = false
+                    pausedForAudioFocus = false
+                    repository.setPaused(false, "Recording")
+                    updateNotification("Recording")
+                }
             }
         }
     }
@@ -78,6 +117,7 @@ class RecordingService : Service() {
                     pauseStartMs = System.currentTimeMillis()
                 }
                 isPaused = true
+                pausedForAudioFocus = false
                 repository.setPaused(true, "Paused")
                 updateNotification("Paused")
                 return START_STICKY
@@ -88,8 +128,15 @@ class RecordingService : Service() {
                     pauseStartMs = 0
                 }
                 isPaused = false
+                pausedForAudioFocus = false
                 repository.setPaused(false, "Recording")
                 updateNotification("Recording")
+                return START_STICKY
+            }
+            "SOURCE_CHANGED" -> {
+                // Notify user that the audio source (e.g., headset) changed, but keep recording
+                repository.setStatus("Recording source changed")
+                updateNotification("Recording source changed")
                 return START_STICKY
             }
         }
@@ -112,6 +159,9 @@ class RecordingService : Service() {
                 showResume = false
             )
         )
+
+        audioManager = getSystemService(AUDIO_SERVICE) as? AudioManager
+        requestAudioFocus()
 
         telephonyManager = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
         try { telephonyManager?.listen(phoneListener, PhoneStateListener.LISTEN_CALL_STATE) } catch (_: SecurityException) {}
@@ -357,12 +407,6 @@ class RecordingService : Service() {
 
     private fun transcribeChunk(sessionId: Long, chunkId: Long) {
         android.util.Log.d("RecordingService", "Starting transcription for chunkId=$chunkId, sessionId=$sessionId")
-        println("==========================================")
-        println("STARTING TRANSCRIPTION")
-        println("==========================================")
-        println("Chunk ID: $chunkId")
-        println("Session ID: $sessionId")
-        println("==========================================")
         
         serviceScope.launch {
             try {
@@ -405,11 +449,6 @@ class RecordingService : Service() {
             onSuccess = { text ->
                 android.util.Log.d("RecordingService", "Transcription successful: $text")
                 transcriptionRepository.updateTranscriptSuccess(sessionId, chunkId, text)
-                println("==========================================")
-                println("TRANSCRIPTION SUCCESS")
-                println("==========================================")
-                println("Text: $text")
-                println("==========================================")
             },
             onFailure = { error ->
                 android.util.Log.e("RecordingService", "Transcription failed (attempt ${retryCount + 1}/$maxRetries): ${error.message}")
@@ -443,11 +482,6 @@ class RecordingService : Service() {
                         chunkId,
                         "Failed after $maxRetries retries: ${error.message}"
                     )
-                    println("==========================================")
-                    println("TRANSCRIPTION FAILED")
-                    println("==========================================")
-                    println("After $maxRetries retries: ${error.message}")
-                    println("==========================================")
                 }
             }
         )
@@ -462,10 +496,45 @@ class RecordingService : Service() {
     private fun stopSelfSafely() {
         timerJob?.cancel()
         telephonyManager?.listen(phoneListener, PhoneStateListener.LISTEN_NONE)
+        abandonAudioFocus()
         // Ensure UI updates immediately even if recording loop finalizer didn't run yet
         repository.clearActive()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    private fun requestAudioFocus() {
+        val am = audioManager ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val attrs = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build()
+            val afr = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                .setAudioAttributes(attrs)
+                .setOnAudioFocusChangeListener(audioFocusChangeListener)
+                .build()
+            audioFocusRequest = afr
+            am.requestAudioFocus(afr)
+        } else {
+            am.requestAudioFocus(
+                audioFocusChangeListener,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE
+            )
+        }
+    }
+
+    private fun abandonAudioFocus() {
+        val am = audioManager ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let {
+                am.abandonAudioFocusRequest(it)
+                audioFocusRequest = null
+            }
+        } else {
+            am.abandonAudioFocus(audioFocusChangeListener)
+        }
     }
 }
 

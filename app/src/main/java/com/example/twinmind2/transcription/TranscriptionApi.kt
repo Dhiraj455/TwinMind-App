@@ -22,9 +22,9 @@ interface TranscriptionApi {
      */
 
     /**
-     * Generate content (transcription) from uploaded file
+     * Generate content (transcription / summary) from uploaded file or text using Gemini 2.5 Flash
      */
-    @POST("models/gemini-2.0-flash-exp:generateContent")
+    @POST("models/gemini-2.5-flash:generateContent")
     suspend fun generateContent(
         @Query("key") apiKey: String,
         @Body request: GenerateContentRequest

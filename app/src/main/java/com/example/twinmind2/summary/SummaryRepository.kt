@@ -103,6 +103,7 @@ class SummaryRepository @Inject constructor(
     }
 
     fun generateSummary(sessionId: Long) {
+        // Preserve original behaviour: run in-process coroutine so UI works immediately
         val existingJob = jobs[sessionId]
         if (existingJob?.isActive == true) return
 
@@ -112,7 +113,7 @@ class SummaryRepository @Inject constructor(
         jobs[sessionId] = job
     }
 
-    private suspend fun runSummaryGeneration(sessionId: Long) {
+    suspend fun runSummaryGeneration(sessionId: Long) {
         try {
             markGenerating(sessionId)
 

@@ -51,12 +51,6 @@ class TranscriptionRepository @Inject constructor(
             android.util.Log.d("TranscriptionRepository", "File exists: ${file.absolutePath}, size: ${file.length()} bytes")
 
             android.util.Log.d("TranscriptionRepository", "Calling Google Gemini 2.5 Flash transcription API")
-            println("==========================================")
-            println("CALLING GOOGLE GEMINI API")
-            println("==========================================")
-            println("File: ${file.name}, Size: ${file.length()} bytes")
-            println("Model: gemini-2.0-flash-exp")
-            println("==========================================")
 
             // Step 1: Upload file to Gemini
             val fileUri = uploadFileToGemini(file)
@@ -194,12 +188,6 @@ class TranscriptionRepository @Inject constructor(
                         val transcriptText = textPart?.text ?: ""
                         
                         android.util.Log.d("TranscriptionRepository", "Transcription result: $transcriptText")
-                        println("==========================================")
-                        println("GOOGLE GEMINI API RESPONSE RECEIVED")
-                        println("==========================================")
-                        println("Transcription Text: $transcriptText")
-                        println("==========================================")
-                        
                         Result.success(transcriptText)
                     } else {
                         Result.failure(Exception("No text parts in response"))
@@ -243,14 +231,6 @@ class TranscriptionRepository @Inject constructor(
                         else -> "API error: ${response.code()} - ${response.message()}"
                     }
                 }
-                
-                println("==========================================")
-                println("GOOGLE GEMINI API ERROR")
-                println("==========================================")
-                println("Code: ${response.code()}")
-                println("Error: $errorMessage")
-                println("Full Body: $errorBody")
-                println("==========================================")
                 
                 Result.failure(Exception(errorMessage))
             }
