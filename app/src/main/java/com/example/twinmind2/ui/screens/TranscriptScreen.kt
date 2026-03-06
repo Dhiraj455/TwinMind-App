@@ -3,6 +3,7 @@ package com.example.twinmind2.ui.screens
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -83,7 +84,9 @@ fun TranscriptScreen(sessionId: Long, navController: NavController) {
                                     Text(
                                         text = "   Error: $it",
                                         color = Color(0xFFE53935),
-                                        fontSize = 12.sp
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        softWrap = true
                                     )
                                 }
                             }
@@ -99,7 +102,9 @@ fun TranscriptScreen(sessionId: Long, navController: NavController) {
                                 Text(
                                     text = transcript.text,
                                     fontSize = 14.sp,
-                                    color = Color.Black
+                                    color = Color.Black,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    softWrap = true
                                 )
                             }
 
@@ -130,7 +135,9 @@ fun TranscriptScreen(sessionId: Long, navController: NavController) {
                             .joinToString(" ") { it.text },
                         fontSize = 14.sp,
                         color = Color.Black,
-                        lineHeight = 20.sp
+                        lineHeight = 20.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        softWrap = true
                     )
                 } else {
                     val completedCount =
@@ -143,7 +150,9 @@ fun TranscriptScreen(sessionId: Long, navController: NavController) {
                     Text(
                         text = "Progress: $completedCount/$totalCount completed${if (pendingCount > 0) ", $pendingCount pending" else ""}${if (failedCount > 0) ", $failedCount failed" else ""}",
                         color = Color(0xFF757575),
-                        fontSize = 12.sp
+                        fontSize = 12.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        softWrap = true
                     )
                 }
             }
@@ -151,6 +160,7 @@ fun TranscriptScreen(sessionId: Long, navController: NavController) {
             Button(onClick = { navController.popBackStack() }) {
                 Text("Back")
             }
+            Spacer(Modifier.height(16.dp)) // Extra padding at bottom
         }
     }
 }

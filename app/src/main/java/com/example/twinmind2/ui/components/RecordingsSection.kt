@@ -171,7 +171,9 @@ private fun RecordingCard(
                         text = session.completeAudioPath?.let { "Recording" } ?: "Empty Transcript Recording",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Black
+                        color = Color.Black,
+                        maxLines = 2,
+                        softWrap = true
                     )
                     val timeStr = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(session.startTimeMs))
                     val duration = if (session.endTimeMs != null && session.endTimeMs > session.startTimeMs) {
@@ -182,7 +184,8 @@ private fun RecordingCard(
                     Text(
                         text = "$timeStr • $duration",
                         fontSize = 12.sp,
-                        color = Color.Gray
+                        color = Color.Gray,
+                        maxLines = 1
                     )
                 }
                 IconButton(

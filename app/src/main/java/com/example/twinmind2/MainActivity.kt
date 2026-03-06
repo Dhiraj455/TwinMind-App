@@ -139,7 +139,7 @@ class MainActivity : ComponentActivity() {
                                 color = Color(0xFF1565C0), // Dark blue
                                 shape = RoundedCornerShape(28.dp)
                             )
-                            .padding(horizontal = 12.dp),
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -171,15 +171,18 @@ class MainActivity : ComponentActivity() {
                         
                         // Center: Timer with dropdown chevron
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
                         ) {
                             Text(
                                 text = "$mm:$ss",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color.White
+                                color = Color.White,
+                                maxLines = 1
                             )
+                            Spacer(Modifier.width(4.dp))
                             Icon(
                                 imageVector = Icons.Filled.ArrowDropDown,
                                 contentDescription = null,
@@ -253,7 +256,8 @@ class MainActivity : ComponentActivity() {
                     vm = vm
                 )
 
-                Spacer(Modifier.height(16.dp))
+                // Extra bottom padding to prevent content from being hidden by bottom bar
+                Spacer(Modifier.height(80.dp))
             }
         }
 

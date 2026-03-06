@@ -35,6 +35,7 @@ import javax.inject.Inject
 class RecordingService : Service() {
     @Inject lateinit var repository: RecordingRepository
     @Inject lateinit var transcriptionRepository: TranscriptionRepository
+    @Inject lateinit var summaryRepository: com.example.twinmind2.summary.SummaryRepository
 
     private val serviceScope = CoroutineScope(Dispatchers.IO)
     private var sessionId: Long? = null
@@ -297,6 +298,9 @@ class RecordingService : Service() {
                     try {
                         val completeFile = concatenateChunksToCompleteAudio(sessionId, sampleRate)
                         repository.updateSessionCompleteAudio(sessionId, completeFile.absolutePath)
+                        
+                        // Wait for all transcripts to complete, then auto-generate summary
+                        waitForTranscriptsAndGenerateSummary(sessionId)
                     } catch (e: Exception) {
                         android.util.Log.e("RecordingService", "Failed to create complete audio", e)
                     }
@@ -491,6 +495,40 @@ class RecordingService : Service() {
         val usable = filesDir.usableSpace
         // Require at least ~20MB free to start/continue
         return usable > 20L * 1024L * 1024L
+    }
+
+    private suspend fun waitForTranscriptsAndGenerateSummary(sessionId: Long) {
+        // Wait for all transcripts to complete (with timeout)
+        var attempts = 0
+        val maxAttempts = 300 // 5 minutes max wait (300 * 1 second)
+        
+        while (attempts < maxAttempts) {
+            val transcripts = transcriptionRepository.observeTranscriptsForSession(sessionId).first()
+            val allCompleted = transcripts.isNotEmpty() && 
+                    transcripts.all { it.status == "completed" }
+            val allFailed = transcripts.isNotEmpty() && 
+                    transcripts.all { it.status == "failed" }
+            
+            if (allCompleted) {
+                // All transcripts completed - generate summary automatically
+                android.util.Log.d("RecordingService", "All transcripts completed, auto-generating summary for session $sessionId")
+                summaryRepository.generateSummary(sessionId)
+                break
+            } else if (allFailed) {
+                // All failed - don't generate summary
+                android.util.Log.w("RecordingService", "All transcripts failed, skipping summary generation")
+                break
+            }
+            
+            delay(1000) // Check every second
+            attempts++
+        }
+        
+        if (attempts >= maxAttempts) {
+            android.util.Log.w("RecordingService", "Timeout waiting for transcripts, generating summary with available transcripts")
+            // Generate summary with whatever transcripts are available
+            summaryRepository.generateSummary(sessionId)
+        }
     }
 
     private fun stopSelfSafely() {

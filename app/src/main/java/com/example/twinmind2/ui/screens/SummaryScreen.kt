@@ -3,6 +3,7 @@ package com.example.twinmind2.ui.screens
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -11,7 +12,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -27,7 +30,19 @@ fun SummaryScreen(sessionId: Long, navController: NavController) {
     val vm: RecordingViewModel = hiltViewModel()
     val summaryState = vm.summaryFor(sessionId).collectAsState(initial = null)
     val summary = summaryState.value
+    val transcripts = vm.transcriptsFor(sessionId).collectAsState(initial = emptyList())
     val scrollState = rememberScrollState()
+    
+    // Auto-generate summary when screen opens if it hasn't been generated yet
+    LaunchedEffect(sessionId) {
+        if (summary == null || summary.status == "idle") {
+            // Check if transcripts are available before generating
+            val transcriptsList = vm.transcriptsFor(sessionId).first()
+            if (transcriptsList.isNotEmpty() && transcriptsList.any { it.status == "completed" }) {
+                vm.generateSummary(sessionId)
+            }
+        }
+    }
 
     Scaffold(
         containerColor = Color(0xFFF5F5F5),
@@ -57,15 +72,13 @@ fun SummaryScreen(sessionId: Long, navController: NavController) {
             when (summary?.status) {
                 null, "idle" -> {
                     Text(
-                        text = "No summary generated yet.",
+                        text = "Generating summary...",
                         fontSize = 14.sp,
                         color = Color.Gray,
                         modifier = Modifier.padding(8.dp)
                     )
                     Spacer(Modifier.height(16.dp))
-                    Button(onClick = { vm.generateSummary(sessionId) }) {
-                        Text("Generate Summary")
-                    }
+                    // Summary will auto-generate via LaunchedEffect above
                 }
 
                 "generating" -> {
@@ -84,7 +97,10 @@ fun SummaryScreen(sessionId: Long, navController: NavController) {
                         text = summary.errorMessage ?: "Failed to generate summary.",
                         fontSize = 14.sp,
                         color = Color(0xFFE53935),
-                        modifier = Modifier.padding(8.dp)
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .fillMaxWidth(),
+                        softWrap = true
                     )
                     Spacer(Modifier.height(16.dp))
                     Button(onClick = { vm.generateSummary(sessionId) }) {
@@ -109,6 +125,7 @@ fun SummaryScreen(sessionId: Long, navController: NavController) {
             Button(onClick = { navController.popBackStack() }) {
                 Text("Back")
             }
+            Spacer(Modifier.height(16.dp)) // Extra padding at bottom
         }
     }
 }
@@ -160,14 +177,18 @@ private fun SummarySectionContent(
             text = "Loading...",
             fontSize = 14.sp,
             color = Color.Gray,
-            modifier = Modifier.padding(start = 12.dp)
+            modifier = Modifier
+                .padding(start = 12.dp, end = 12.dp)
+                .fillMaxWidth()
         )
 
         content.isNullOrBlank() -> Text(
             text = "Not available",
             fontSize = 14.sp,
             color = Color.Gray,
-            modifier = Modifier.padding(start = 12.dp)
+            modifier = Modifier
+                .padding(start = 12.dp, end = 12.dp)
+                .fillMaxWidth()
         )
 
         asBullets -> {
@@ -181,7 +202,10 @@ private fun SummarySectionContent(
                     text = content,
                     fontSize = 14.sp,
                     color = Color.Black,
-                    modifier = Modifier.padding(start = 12.dp)
+                    modifier = Modifier
+                        .padding(start = 12.dp, end = 12.dp)
+                        .fillMaxWidth(),
+                    softWrap = true
                 )
             } else {
                 items.forEach { item ->
@@ -189,7 +213,10 @@ private fun SummarySectionContent(
                         text = "• $item",
                         fontSize = 14.sp,
                         color = Color.Black,
-                        modifier = Modifier.padding(start = 16.dp, bottom = 2.dp)
+                        modifier = Modifier
+                            .padding(start = 16.dp, end = 12.dp, bottom = 2.dp)
+                            .fillMaxWidth(),
+                        softWrap = true
                     )
                 }
             }
@@ -199,7 +226,10 @@ private fun SummarySectionContent(
             text = content,
             fontSize = 14.sp,
             color = Color.Black,
-            modifier = Modifier.padding(start = 12.dp)
+            modifier = Modifier
+                .padding(start = 12.dp, end = 12.dp)
+                .fillMaxWidth(),
+            softWrap = true
         )
     }
 }
