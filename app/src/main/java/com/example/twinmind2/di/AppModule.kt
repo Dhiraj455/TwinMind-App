@@ -39,8 +39,13 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideRecordingRepository(dao: RecordingDao, @ApplicationContext context: Context): RecordingRepository =
-        RecordingRepository(context, dao)
+    fun provideRecordingRepository(
+        dao: RecordingDao,
+        transcriptDao: TranscriptDao,
+        summaryDao: SummaryDao,
+        @ApplicationContext context: Context
+    ): RecordingRepository =
+        RecordingRepository(context, dao, transcriptDao, summaryDao)
 
     @Provides
     @Singleton

@@ -2,6 +2,8 @@ package com.example.twinmind2.recording
 
 import android.content.Context
 import com.example.twinmind2.data.dao.RecordingDao
+import com.example.twinmind2.data.dao.SummaryDao
+import com.example.twinmind2.data.dao.TranscriptDao
 import com.example.twinmind2.data.entity.AudioChunk
 import com.example.twinmind2.data.entity.RecordingSession
 import kotlinx.coroutines.flow.Flow
@@ -11,7 +13,9 @@ import java.io.File
 
 class RecordingRepository(
     private val appContext: Context,
-    private val dao: RecordingDao
+    private val dao: RecordingDao,
+    private val transcriptDao: TranscriptDao,
+    private val summaryDao: SummaryDao
 ) {
     data class RecordingUiState(
         val activeSessionId: Long? = null,
@@ -79,8 +83,13 @@ class RecordingRepository(
     }
 
     suspend fun deleteSession(sessionId: Long) {
+        // Delete all related data from database
         dao.deleteChunksForSession(sessionId)
+        transcriptDao.deleteTranscriptsForSession(sessionId)
+        summaryDao.deleteSummaryForSession(sessionId)
         dao.deleteSession(sessionId)
+        
+        // Delete all audio files from storage
         val sessionDir = getSessionDir(sessionId)
         if (sessionDir.exists()) {
             sessionDir.deleteRecursively()
