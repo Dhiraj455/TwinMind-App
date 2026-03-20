@@ -8,28 +8,30 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,10 +40,25 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.twinmind2.ui.theme.BackgroundHome
+import com.example.twinmind2.ui.theme.DividerGray
+import com.example.twinmind2.ui.theme.OrangeAccent
+import com.example.twinmind2.ui.theme.RecordingPillDark
+import com.example.twinmind2.ui.theme.RecordingPillMid
+import com.example.twinmind2.ui.theme.RecordingRed
+import com.example.twinmind2.ui.theme.TextPrimary
+import com.example.twinmind2.ui.theme.TextSecondary
+import com.example.twinmind2.ui.theme.TwinMindDark
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
@@ -51,14 +68,14 @@ import com.example.twinmind2.recording.RecordingNotifications
 import com.example.twinmind2.recording.RecordingService
 import com.example.twinmind2.recording.RecordingViewModel
 import com.example.twinmind2.ui.components.BottomActionButtons
-import com.example.twinmind2.ui.components.Calender
-import com.example.twinmind2.ui.components.Header
-import com.example.twinmind2.ui.components.NavigationIcons
-import com.example.twinmind2.ui.components.RecordingsSession
-import com.example.twinmind2.ui.screens.SummaryScreen
+import com.example.twinmind2.ui.components.ComingUpSection
+import com.example.twinmind2.ui.components.HomeFeatureCards
+import com.example.twinmind2.ui.components.HomeTopBar
+import com.example.twinmind2.ui.screens.MemoriesScreen
+import com.example.twinmind2.ui.screens.RecordingDetailScreen
+import com.example.twinmind2.ui.screens.TodoScreen
 import com.example.twinmind2.ui.theme.TwinMind2Theme
 import dagger.hilt.android.AndroidEntryPoint
-import com.example.twinmind2.ui.screens.TranscriptScreen
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -71,7 +88,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             TwinMind2Theme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    containerColor = BackgroundHome
+                ) { innerPadding ->
                     MainNavigation(modifier = Modifier.padding(innerPadding))
                 }
             }
@@ -97,135 +117,128 @@ class MainActivity : ComponentActivity() {
             modifier = modifier
         ) {
             composable("home") {
-                RecordingScreen(navController = navController)
+                HomeScreen(navController = navController)
             }
-            composable("transcript/{sessionId}") { backStackEntry ->
+            composable("memories") {
+                MemoriesScreen(navController = navController)
+            }
+            composable("todo") {
+                TodoScreen(navController = navController)
+            }
+            composable("recording/{sessionId}") { backStackEntry ->
                 val sessionId =
                     backStackEntry.arguments?.getString("sessionId")?.toLongOrNull() ?: 0L
-                TranscriptScreen(sessionId = sessionId, navController = navController)
-            }
-            composable("summary/{sessionId}") { backStackEntry ->
-                val sessionId =
-                    backStackEntry.arguments?.getString("sessionId")?.toLongOrNull() ?: 0L
-                SummaryScreen(sessionId = sessionId, navController = navController)
+                RecordingDetailScreen(sessionId = sessionId, navController = navController)
             }
         }
     }
 
     @Composable
-    private fun RecordingScreen(navController: NavController, modifier: Modifier = Modifier) {
+    private fun HomeScreen(navController: NavController, modifier: Modifier = Modifier) {
         val vm: RecordingViewModel = hiltViewModel()
         val state = vm.recordingState.collectAsState()
-        val sessions = vm.sessions.collectAsState()
-        val selectedTab = remember { mutableStateOf("Notes") }
         val scrollState = rememberScrollState()
 
         Scaffold(
             modifier = modifier.fillMaxSize(),
-            containerColor = Color(0xFFF5F5F5),
+            containerColor = BackgroundHome,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             bottomBar = {
                 if (state.value.activeSessionId != null) {
-                    // Recording bar - horizontal pill-shaped bar with timer and stop button
                     val elapsed = state.value.elapsedSec
                     val mm = (elapsed / 60).toString().padStart(2, '0')
                     val ss = (elapsed % 60).toString().padStart(2, '0')
-                    
-                    Row(
+
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .height(56.dp)
-                            .background(
-                                color = Color(0xFF1565C0), // Dark blue
-                                shape = RoundedCornerShape(28.dp)
-                            )
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
                     ) {
-                        // Left: Waveform icon (three vertical lines)
                         Row(
-                            modifier = Modifier.width(24.dp),
-                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(62.dp)
+                                .shadow(10.dp, RoundedCornerShape(31.dp))
+                                .clip(RoundedCornerShape(31.dp))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(RecordingPillDark, RecordingPillMid)
+                                    )
+                                )
+                                .padding(horizontal = 18.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .width(3.dp)
-                                    .height(12.dp)
-                                    .background(Color.White, RoundedCornerShape(1.5.dp))
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .width(3.dp)
-                                    .height(18.dp)
-                                    .background(Color.White, RoundedCornerShape(1.5.dp))
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .width(3.dp)
-                                    .height(14.dp)
-                                    .background(Color.White, RoundedCornerShape(1.5.dp))
-                            )
-                        }
-                        
-                        // Center: Timer with dropdown chevron
-                        Row(
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(
-                                text = "$mm:$ss",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color.White,
-                                maxLines = 1
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Icon(
-                                imageVector = Icons.Filled.ArrowDropDown,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        
-                        // Right: Circular white button with red square inside
-                        IconButton(
-                            onClick = {
-                                val intent = Intent(this@MainActivity, RecordingService::class.java).setAction(
-                                    RecordingNotifications.ACTION_STOP
+                            // Live waveform bars
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                listOf(10.dp, 18.dp, 12.dp, 20.dp, 14.dp).forEach { h ->
+                                    Box(
+                                        modifier = Modifier
+                                            .width(3.dp)
+                                            .height(h)
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    listOf(Color(0xFF8E54E9), Color(0xFF4776E6))
+                                                ),
+                                                RoundedCornerShape(2.dp)
+                                            )
+                                    )
+                                }
+                            }
+
+                            Row(
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = "$mm:$ss",
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White,
+                                    maxLines = 1
                                 )
-                                startService(intent)
-                            },
-                            modifier = Modifier.size(40.dp)
-                        ) {
+                                Spacer(Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Filled.ArrowDropDown,
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
                             Box(
                                 modifier = Modifier
-                                    .size(40.dp)
-                                    .background(Color.White, CircleShape),
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White)
+                                    .clickable {
+                                        val intent = Intent(
+                                            this@MainActivity, RecordingService::class.java
+                                        ).setAction(RecordingNotifications.ACTION_STOP)
+                                        startService(intent)
+                                    },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .size(16.dp)
-                                        .background(Color(0xFFD32F2F), RoundedCornerShape(2.dp))
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(RecordingRed)
                                 )
                             }
                         }
                     }
                 } else {
-                    // Show "Capture Now" button when not recording
                     BottomActionButtons(
                         currentlyRecording = false,
-                        isPaused = false,
                         onRecordClick = {
                             val intent = Intent(this@MainActivity, RecordingService::class.java)
                             if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
                         },
-                        onPauseClick = {},
-                        onResumeClick = {}
                     )
                 }
             }
@@ -236,70 +249,91 @@ class MainActivity : ComponentActivity() {
                     .padding(innerPadding)
                     .verticalScroll(scrollState)
             ) {
-                Header()
+                HomeTopBar()
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(8.dp))
 
-                NavigationIcons()
+                // Greeting + promo text
+                Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                    Text(
+                        text = buildAnnotatedString {
+                            withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 22.sp, color = TwinMindDark)) {
+                                append("Hey Dhiraj Shelke,\n")
+                            }
+                            withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 22.sp, color = TwinMindDark)) {
+                                append("Capture 5 notes to unlock\nTwinMind Pro for free")
+                            }
+                        },
+                        lineHeight = 30.sp
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .border(1.5.dp, DividerGray, CircleShape)
+                            .clickable {},
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(">", fontSize = 14.sp, color = TextSecondary)
+                    }
+                }
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(28.dp))
 
-                Calender()
+                // Chat with all your memories button
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .shadow(2.dp, RoundedCornerShape(28.dp))
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(Color.White)
+                        .border(1.dp, DividerGray, RoundedCornerShape(28.dp))
+                        .clickable {}
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            tint = TwinMindDark,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = buildAnnotatedString {
+                                withStyle(SpanStyle(color = TextSecondary, fontSize = 15.sp)) {
+                                    append("Chat with all ")
+                                }
+                                withStyle(SpanStyle(color = OrangeAccent, fontSize = 15.sp, fontWeight = FontWeight.Medium)) {
+                                    append("your memories")
+                                }
+                            }
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                // Feature cards (To-Do + Notes & Chats)
+                HomeFeatureCards(
+                    onTodoClick = { navController.navigate("todo") },
+                    onMemoriesClick = { navController.navigate("memories") }
+                )
 
                 Spacer(Modifier.height(24.dp))
 
-                RecordingsSession(
-                    sessions = sessions.value,
-                    selectedTab = selectedTab.value,
-                    onTabSelected = { selectedTab.value = it },
-                    navController = navController,
-                    vm = vm
-                )
+                // Coming Up
+                ComingUpSection()
 
-                // Extra bottom padding to prevent content from being hidden by bottom bar
                 Spacer(Modifier.height(80.dp))
             }
         }
 
         LaunchedEffect(Unit) { RecordingNotifications.ensureChannels(this@MainActivity) }
-    }
-
-    private fun openAudio(path: String) {
-        try {
-            val file = java.io.File(path)
-            if (!file.exists()) {
-                android.util.Log.e("MainActivity", "Audio file not found: $path")
-                return
-            }
-
-            val uri = androidx.core.content.FileProvider.getUriForFile(
-                this,
-                this.packageName + ".provider",
-                file
-            )
-
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "audio/wav")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-
-            val resInfoList = packageManager.queryIntentActivities(
-                intent,
-                android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
-            )
-            for (resolveInfo in resInfoList) {
-                val packageName = resolveInfo.activityInfo.packageName
-                grantUriPermission(
-                    packageName,
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            }
-
-            startActivity(intent)
-        } catch (e: Exception) {
-            android.util.Log.e("MainActivity", "Error opening audio file", e)
-        }
     }
 }

@@ -1,7 +1,6 @@
 package com.example.twinmind2.transcription
 
 import android.content.Context
-import android.content.SharedPreferences
 import com.example.twinmind2.data.dao.TranscriptDao
 import com.example.twinmind2.data.entity.AudioChunk
 import com.example.twinmind2.data.entity.Transcript

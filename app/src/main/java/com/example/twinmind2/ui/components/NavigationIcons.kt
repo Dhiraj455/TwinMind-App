@@ -11,64 +11,99 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.filled.CheckBox
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.twinmind2.ui.theme.CardBlueBg
+import com.example.twinmind2.ui.theme.CardPeachBg
+import com.example.twinmind2.ui.theme.TextPrimary
+import com.example.twinmind2.ui.theme.TextSecondary
 
 @Composable
-fun NavigationIcons() {
+fun HomeFeatureCards(
+    onTodoClick: () -> Unit,
+    onMemoriesClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        FeatureIcon(icon = Icons.Default.Person, label = "Suggestions")
-        FeatureIcon(icon = Icons.Default.CheckCircle, label = "To-do")
-        FeatureIcon(icon = Icons.Default.DateRange, label = "Digest")
-        FeatureIcon(icon = Icons.Outlined.Build, label = "Insights")
+        FeatureCard(
+            modifier = Modifier.weight(1f),
+            backgroundColor = CardBlueBg,
+            icon = Icons.Filled.CheckBox,
+            iconTint = Color(0xFF3A7BD5),
+            title = "To-Do",
+            subtitle = "View Tasks",
+            onClick = onTodoClick
+        )
+        FeatureCard(
+            modifier = Modifier.weight(1f),
+            backgroundColor = CardPeachBg,
+            icon = Icons.Filled.Folder,
+            iconTint = Color(0xFFE07828),
+            title = "Notes & Chats",
+            subtitle = "View Memories",
+            onClick = onMemoriesClick
+        )
     }
 }
 
 @Composable
-private fun FeatureIcon(icon: ImageVector, label: String) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { }
+private fun FeatureCard(
+    modifier: Modifier = Modifier,
+    backgroundColor: Color,
+    icon: ImageVector,
+    iconTint: Color,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .height(110.dp)
+            .shadow(2.dp, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(backgroundColor)
+            .clickable { onClick() }
+            .padding(16.dp)
     ) {
-        Box(
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconTint,
             modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(Color.White)
-                .padding(12.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = Color(0xFF1976D2),
-                modifier = Modifier.size(32.dp)
+                .size(28.dp)
+                .align(Alignment.TopEnd)
+        )
+        Column(modifier = Modifier.align(Alignment.BottomStart)) {
+            Text(
+                text = title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "$subtitle >",
+                fontSize = 12.sp,
+                color = TextSecondary
             )
         }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            color = Color.Black
-        )
     }
 }

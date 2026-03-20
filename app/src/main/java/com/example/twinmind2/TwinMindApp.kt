@@ -14,7 +14,6 @@ class TwinMindApp : Application(), Configuration.Provider {
     lateinit var workerFactory: HiltWorkerFactory
 
     init {
-        // This runs BEFORE onCreate, so factory won't be ready yet
         android.util.Log.d("TwinMindApp", "TwinMindApp init block")
     }
 

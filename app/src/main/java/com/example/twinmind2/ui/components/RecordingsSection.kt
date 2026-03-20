@@ -2,8 +2,10 @@ package com.example.twinmind2.ui.components
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,18 +15,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -33,6 +33,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -41,6 +44,12 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.navigation.NavController
 import com.example.twinmind2.recording.RecordingViewModel
+import com.example.twinmind2.ui.theme.BackgroundMain
+import com.example.twinmind2.ui.theme.GradientBlueStart
+import com.example.twinmind2.ui.theme.GradientPurpleEnd
+import com.example.twinmind2.ui.theme.RecordingRed
+import com.example.twinmind2.ui.theme.TextPrimary
+import com.example.twinmind2.ui.theme.TextSecondary
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -59,7 +68,6 @@ fun RecordingsSession(
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
     ) {
-        // Date and Tabs
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -69,12 +77,11 @@ fun RecordingsSession(
                 text = SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(Date()),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black
+                color = TextPrimary
             )
 
-            Row {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TabButton("Notes", selectedTab == "Notes", onTabSelected)
-                Spacer(Modifier.width(8.dp))
                 TabButton("Chats", selectedTab == "Chats", onTabSelected)
             }
         }
@@ -83,12 +90,18 @@ fun RecordingsSession(
 
         if (selectedTab == "Notes") {
             if (sessions.isEmpty()) {
-                Text(
-                    text = "No recordings yet",
-                    fontSize = 14.sp,
-                    color = Color.Gray,
-                    modifier = Modifier.padding(vertical = 16.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No recordings yet",
+                        fontSize = 14.sp,
+                        color = TextSecondary
+                    )
+                }
             } else {
                 sessions.take(5).forEach { session ->
                     RecordingCard(
@@ -100,34 +113,44 @@ fun RecordingsSession(
                 }
             }
         } else {
-            Text(
-                text = "No chats yet",
-                fontSize = 14.sp,
-                color = Color.Gray,
-                modifier = Modifier.padding(vertical = 16.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No chats yet",
+                    fontSize = 14.sp,
+                    color = TextSecondary
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun TabButton(label: String, isSelected: Boolean, onSelected: (String) -> Unit) {
-    OutlinedButton(
-        onClick = { onSelected(label) },
-        modifier = Modifier.height(32.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = if (isSelected) {
-            ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2))
-        } else {
-            ButtonDefaults.outlinedButtonColors()
-        },
-        border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1976D2)),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
+    Box(
+        modifier = Modifier
+            .height(32.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .then(
+                if (isSelected)
+                    Modifier.background(
+                        Brush.horizontalGradient(listOf(GradientBlueStart, GradientPurpleEnd))
+                    )
+                else
+                    Modifier.background(BackgroundMain)
+            )
+            .clickable { onSelected(label) }
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
             fontSize = 12.sp,
-            color = if (isSelected) Color.White else Color(0xFF1976D2),
+            color = if (isSelected) Color.White else TextSecondary,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
         )
     }
@@ -145,125 +168,139 @@ private fun RecordingCard(
 
     Card(
         modifier = Modifier
-            .fillMaxWidth(),
+            .fillMaxWidth()
+            .shadow(6.dp, RoundedCornerShape(16.dp)),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
-                        expandedState.value = !expandedState.value
-                    }
+                    .clickable { expandedState.value = !expandedState.value }
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.MailOutline,
-                    contentDescription = null,
-                    tint = Color(0xFF1976D2),
-                    modifier = Modifier.size(24.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(listOf(GradientBlueStart, GradientPurpleEnd))
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MailOutline,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = session.completeAudioPath?.let { "Recording" } ?: "Empty Transcript Recording",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary,
                         maxLines = 2,
                         softWrap = true
                     )
                     val timeStr = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(session.startTimeMs))
                     val duration = if (session.endTimeMs != null && session.endTimeMs > session.startTimeMs) {
                         ((session.endTimeMs - session.startTimeMs) / 1000).toString() + "s"
-                    } else {
-                        ""
-                    }
+                    } else ""
                     Text(
-                        text = "$timeStr • $duration",
+                        text = "$timeStr${if (duration.isNotEmpty()) " • $duration" else ""}",
                         fontSize = 12.sp,
-                        color = Color.Gray,
+                        color = TextSecondary,
                         maxLines = 1
                     )
                 }
                 IconButton(
-                    onClick = {
-                        vm.deleteSession(session.id)
-                    },
+                    onClick = { vm.deleteSession(session.id) },
                     modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Delete",
-                        tint = Color(0xFFD32F2F),
-                        modifier = Modifier.size(24.dp)
+                        tint = RecordingRed.copy(alpha = 0.75f),
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
 
-            // Expanded section with buttons, chunks, and complete audio
             if (expandedState.value) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Button(
-                            onClick = { navController.navigate("transcript/${session.id}") },
+                        Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2))
+                                .height(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(GradientBlueStart, GradientPurpleEnd)
+                                    )
+                                )
+                                .clickable { navController.navigate("transcript/${session.id}") },
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "Transcript",
                                 fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
+                                fontWeight = FontWeight.SemiBold,
                                 color = Color.White
                             )
                         }
-                        Button(
-                            onClick = { navController.navigate("summary/${session.id}") },
+                        Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2))
+                                .height(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(GradientPurpleEnd, GradientBlueStart)
+                                    )
+                                )
+                                .clickable { navController.navigate("summary/${session.id}") },
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "Summary",
                                 fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
+                                fontWeight = FontWeight.SemiBold,
                                 color = Color.White
                             )
                         }
                     }
-                    
-                    Spacer(Modifier.height(16.dp))
 
                     session.completeAudioPath?.let { audioPath ->
+                        Spacer(Modifier.height(14.dp))
                         AudioFileItem(
                             label = "Complete Audio",
                             filePath = audioPath,
                             context = context
                         )
-                        Spacer(Modifier.height(12.dp))
                     }
 
                     if (chunks.isNotEmpty()) {
+                        Spacer(Modifier.height(10.dp))
                         Text(
-                            text = "Audio Chunks:",
-                            fontSize = 14.sp,
+                            text = "Audio Chunks",
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.Black,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                            color = TextPrimary,
+                            modifier = Modifier.padding(bottom = 6.dp)
                         )
                         chunks.forEach { chunk ->
                             AudioFileItem(
@@ -271,42 +308,37 @@ private fun RecordingCard(
                                 filePath = chunk.filePath,
                                 context = context
                             )
-                            Spacer(Modifier.height(8.dp))
+                            Spacer(Modifier.height(4.dp))
                         }
                     }
                 }
-                Spacer(Modifier.height(8.dp))
             }
         }
     }
 }
 
 @Composable
-private fun AudioFileItem(
-    label: String,
-    filePath: String,
-    context: Context
-) {
+private fun AudioFileItem(label: String, filePath: String, context: Context) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable {
-                openAudioFile(context, filePath)
-            }
-            .padding(vertical = 8.dp, horizontal = 4.dp),
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFFF0F2FF))
+            .clickable { openAudioFile(context, filePath) }
+            .padding(vertical = 10.dp, horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = Icons.Default.PlayArrow,
             contentDescription = "Play",
-            tint = Color(0xFF1976D2),
+            tint = GradientBlueStart,
             modifier = Modifier.size(20.dp)
         )
         Spacer(Modifier.width(8.dp))
         Text(
             text = label,
             fontSize = 13.sp,
-            color = Color(0xFF1976D2),
+            color = GradientBlueStart,
             fontWeight = FontWeight.Medium
         )
     }
@@ -319,32 +351,20 @@ private fun openAudioFile(context: Context, path: String) {
             android.util.Log.e("RecordingsSection", "Audio file not found: $path")
             return
         }
-
-        val uri = FileProvider.getUriForFile(
-            context,
-            context.packageName + ".provider",
-            file
-        )
-
+        val uri = FileProvider.getUriForFile(context, context.packageName + ".provider", file)
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "audio/wav")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-
         val resInfoList = context.packageManager.queryIntentActivities(
-            intent,
-            android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
+            intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
         )
         for (resolveInfo in resInfoList) {
-            val packageName = resolveInfo.activityInfo.packageName
             context.grantUriPermission(
-                packageName,
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                resolveInfo.activityInfo.packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
         }
-
         context.startActivity(intent)
     } catch (e: Exception) {
         android.util.Log.e("RecordingsSection", "Error opening audio file", e)

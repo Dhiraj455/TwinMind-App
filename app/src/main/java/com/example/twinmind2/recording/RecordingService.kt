@@ -13,9 +13,11 @@ import android.os.Build
 import android.os.IBinder
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
+import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationManagerCompat
 import com.example.twinmind2.data.entity.AudioChunk
+import com.example.twinmind2.summary.SummaryRepository
 import com.example.twinmind2.transcription.TranscriptionRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -35,7 +37,7 @@ import javax.inject.Inject
 class RecordingService : Service() {
     @Inject lateinit var repository: RecordingRepository
     @Inject lateinit var transcriptionRepository: TranscriptionRepository
-    @Inject lateinit var summaryRepository: com.example.twinmind2.summary.SummaryRepository
+    @Inject lateinit var summaryRepository: SummaryRepository
 
     private val serviceScope = CoroutineScope(Dispatchers.IO)
     private var sessionId: Long? = null
@@ -50,6 +52,7 @@ class RecordingService : Service() {
 
     private var telephonyManager: TelephonyManager? = null
     private val phoneListener = object : PhoneStateListener() {
+        @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
         override fun onCallStateChanged(state: Int, phoneNumber: String?) {
             if (state != TelephonyManager.CALL_STATE_IDLE) {
                 if (!isPaused) {
@@ -202,7 +205,7 @@ class RecordingService : Service() {
         }
     }
     
-    private suspend fun doRecordLoop(sessionId: Long) {
+    private fun doRecordLoop(sessionId: Long) {
         recordJob = serviceScope.launch {
             val sampleRate = 16000
             val channelConfig = AudioFormat.CHANNEL_IN_MONO
@@ -302,7 +305,7 @@ class RecordingService : Service() {
                         // Wait for all transcripts to complete, then auto-generate summary
                         waitForTranscriptsAndGenerateSummary(sessionId)
                     } catch (e: Exception) {
-                        android.util.Log.e("RecordingService", "Failed to create complete audio", e)
+                        Log.e("RecordingService", "Failed to create complete audio", e)
                     }
                 }
                 
@@ -480,7 +483,7 @@ class RecordingService : Service() {
                     transcribeWithRetry(sessionId, chunkId, chunk, nextRetryCount, maxRetries)
                 } else {
                     // Max retries reached
-                    android.util.Log.e("RecordingService", "Transcription failed after $maxRetries retries")
+                    Log.e("RecordingService", "Transcription failed after $maxRetries retries")
                     transcriptionRepository.updateTranscriptFailure(
                         sessionId,
                         chunkId,
