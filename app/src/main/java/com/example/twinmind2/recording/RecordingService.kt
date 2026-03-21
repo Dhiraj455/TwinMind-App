@@ -14,6 +14,7 @@ import android.os.IBinder
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import android.util.Log
+import android.widget.Toast
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationManagerCompat
 import com.example.twinmind2.data.entity.AudioChunk
@@ -139,8 +140,9 @@ class RecordingService : Service() {
             }
             "SOURCE_CHANGED" -> {
                 // Notify user that the audio source (e.g., headset) changed, but keep recording
-                repository.setStatus("Recording source changed")
-                updateNotification("Recording source changed")
+                val message = intent.getStringExtra("source_message") ?: "Recording source changed"
+                repository.setStatus(message)
+                updateNotification(message)
                 return START_STICKY
             }
         }
@@ -232,6 +234,7 @@ class RecordingService : Service() {
             var currentChunkStart = System.currentTimeMillis()
             var currentChunkPcm = ByteArray(0)
             var silentAccumulatedMs = 0L
+            var silenceAlertShown = false
 
             try {
                 while (isActive) {
@@ -248,11 +251,23 @@ class RecordingService : Service() {
 
                         // Silence detection (simple RMS threshold)
                         val rms = rms(buffer, read)
-                        if (rms < 200) silentAccumulatedMs += (read * 1000L) / (sampleRate)
-                        else silentAccumulatedMs = 0
-                        if (silentAccumulatedMs >= 10_000L) {
-                            repository.setStatus("No audio detected - Check microphone")
-                            updateNotification("No audio detected - Check microphone")
+                        if (rms < 200) {
+                            silentAccumulatedMs += (read * 1000L) / (sampleRate)
+                            if (silentAccumulatedMs >= 10_000L && !silenceAlertShown) {
+                                silenceAlertShown = true
+                                repository.setStatus("No audio detected - Check microphone")
+                                updateNotification("No audio detected - Check microphone")
+                                serviceScope.launch(Dispatchers.Main) {
+                                    Toast.makeText(
+                                        this@RecordingService,
+                                        "No audio detected - Check microphone",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                        } else {
+                            silentAccumulatedMs = 0
+                            silenceAlertShown = false
                         }
 
                         val elapsedChunkMs = System.currentTimeMillis() - currentChunkStart
@@ -453,9 +468,17 @@ class RecordingService : Service() {
         val result = transcriptionRepository.transcribeChunk(chunk)
         
         result.fold(
-            onSuccess = { text ->
-                android.util.Log.d("RecordingService", "Transcription successful: $text")
-                transcriptionRepository.updateTranscriptSuccess(sessionId, chunkId, text)
+            onSuccess = { rawText ->
+               // Log.d("RecordingService", "Transcription successful: $rawText")
+                val cleanedText = runCatching {
+                    transcriptionRepository.contextCorrectTranscript(sessionId, rawText).getOrDefault(rawText)
+                }.getOrDefault(rawText)
+                transcriptionRepository.updateTranscriptSuccess(
+                    sessionId = sessionId,
+                    chunkId = chunkId,
+                    rawText = rawText,
+                    cleanedText = cleanedText
+                )
             },
             onFailure = { error ->
                 android.util.Log.e("RecordingService", "Transcription failed (attempt ${retryCount + 1}/$maxRetries): ${error.message}")
@@ -504,6 +527,7 @@ class RecordingService : Service() {
         // Wait for all transcripts to complete (with timeout)
         var attempts = 0
         val maxAttempts = 300 // 5 minutes max wait (300 * 1 second)
+        var didGlobalRetry = false
         
         while (attempts < maxAttempts) {
             val transcripts = transcriptionRepository.observeTranscriptsForSession(sessionId).first()
@@ -511,6 +535,16 @@ class RecordingService : Service() {
                     transcripts.all { it.status == "completed" }
             val allFailed = transcripts.isNotEmpty() && 
                     transcripts.all { it.status == "failed" }
+            val hasAnyFailed = transcripts.any { it.status == "failed" }
+
+            // If any chunk fails, run one global retry pass for all chunks.
+            if (hasAnyFailed && !didGlobalRetry) {
+                Log.w("RecordingService", "Detected failed chunk(s); retrying all chunks once")
+                retryAllChunksTranscription(sessionId)
+                didGlobalRetry = true
+                attempts = 0
+                continue
+            }
             
             if (allCompleted) {
                 // All transcripts completed - generate summary automatically
@@ -531,6 +565,22 @@ class RecordingService : Service() {
             android.util.Log.w("RecordingService", "Timeout waiting for transcripts, generating summary with available transcripts")
             // Generate summary with whatever transcripts are available
             summaryRepository.generateSummary(sessionId)
+        }
+    }
+
+    private suspend fun retryAllChunksTranscription(sessionId: Long) {
+        val chunks = repository.observeChunks(sessionId).first().sortedBy { it.indexInSession }
+        for (chunk in chunks) {
+            val existingTranscript = transcriptionRepository.getTranscriptForChunk(sessionId, chunk.id)
+            if (existingTranscript == null) {
+                transcriptionRepository.createPendingTranscript(chunk)
+            }
+            transcribeWithRetry(
+                sessionId = sessionId,
+                chunkId = chunk.id,
+                chunk = chunk,
+                retryCount = 0
+            )
         }
     }
 

@@ -3,6 +3,9 @@ package com.example.twinmind2.ui.screens
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import androidx.core.content.FileProvider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,13 +31,20 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -49,9 +59,13 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.withStyle
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.twinmind2.data.entity.Summary
@@ -73,6 +87,7 @@ import java.util.Date
 import java.util.Locale
 
 private val detailTabs = listOf("Questions", "Notes", "Transcript")
+private val audioTabLabel = "Audio"
 
 @Composable
 fun RecordingDetailScreen(sessionId: Long, navController: NavController) {
@@ -82,11 +97,16 @@ fun RecordingDetailScreen(sessionId: Long, navController: NavController) {
     val summary by vm.summaryFor(sessionId).collectAsState(initial = null)
     val transcripts by vm.transcriptsFor(sessionId).collectAsState(initial = emptyList())
     var selectedTab by remember { mutableStateOf("Questions") }
+    var showMenu by remember { mutableStateOf(false) }
+    var isEditingTitle by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var renameTitle by remember { mutableStateOf("") }
     val scrollState = rememberScrollState()
     val context = LocalContext.current
 
     LaunchedEffect(sessionId) {
-        if (summary == null || summary?.status == "idle") {
+        val existingSummary = vm.getSummaryOnce(sessionId)
+        if (existingSummary == null || existingSummary.status == "idle") {
             val transcriptsList = vm.transcriptsFor(sessionId).first()
             if (transcriptsList.any { it.status == "completed" }) {
                 vm.generateSummary(sessionId)
@@ -168,24 +188,119 @@ fun RecordingDetailScreen(sessionId: Long, navController: NavController) {
                             color = TextPrimary
                         )
                     }
-                    IconButton(onClick = {}) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "More",
-                            tint = TextPrimary
-                        )
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "More",
+                                tint = TextPrimary
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                                DropdownMenuItem(
+                                    text = { Text("Rename title") },
+                                    onClick = {
+                                        renameTitle = title
+                                        isEditingTitle = true
+                                        showMenu = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Copy transcript") },
+                                    onClick = {
+                                        val transcriptText = transcripts
+                                            .sortedBy { it.chunkIndex }
+                                            .filter { it.status == "completed" }
+                                            .joinToString("\n") { it.text }
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        clipboard.setPrimaryClip(ClipData.newPlainText("Transcript", transcriptText))
+                                        showMenu = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Copy summary") },
+                                    onClick = {
+                                        val summaryText = buildString {
+                                            summary?.title?.takeIf { it.isNotBlank() }?.let { appendLine(it) }
+                                            summary?.summary?.takeIf { it.isNotBlank() }?.let {
+                                                appendLine()
+                                                appendLine("Summary")
+                                                appendLine(it)
+                                            }
+                                            summary?.actionItems?.takeIf { it.isNotBlank() }?.let {
+                                                appendLine()
+                                                appendLine("Action Items")
+                                                appendLine(it)
+                                            }
+                                            summary?.keyPoints?.takeIf { it.isNotBlank() }?.let {
+                                                appendLine()
+                                                appendLine("Key Points")
+                                                appendLine(it)
+                                            }
+                                        }.ifBlank { "No summary available yet." }
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        clipboard.setPrimaryClip(ClipData.newPlainText("Summary", summaryText))
+                                        showMenu = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Delete") },
+                                    onClick = {
+                                        showDeleteDialog = true
+                                        showMenu = false
+                                    }
+                                )
+                        }
                     }
                 }
 
                 // Title + metadata
                 Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
-                    Text(
-                        text = title,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        lineHeight = 28.sp
-                    )
+                    if (isEditingTitle) {
+                        OutlinedTextField(
+                            value = renameTitle,
+                            onValueChange = { renameTitle = it },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = TextStyle(color = Color.Black),
+//                            label = { Text("Recording title") }
+                        )
+                        Row(
+                            modifier = Modifier.padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            TextButton(
+                                onClick = {
+                                    val trimmed = renameTitle.trim()
+                                    if (trimmed.isNotEmpty()) {
+                                        vm.renameSessionTitle(sessionId, trimmed)
+                                    }
+                                    isEditingTitle = false
+                                }
+                            ) {
+                                Text("Save")
+                            }
+                            TextButton(
+                                onClick = {
+                                    renameTitle = title
+                                    isEditingTitle = false
+                                }
+                            ) {
+                                Text("Cancel")
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = title,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            lineHeight = 28.sp
+                        )
+                    }
                     if (metaStr.isNotEmpty()) {
                         Spacer(Modifier.height(6.dp))
                         Text(
@@ -193,6 +308,31 @@ fun RecordingDetailScreen(sessionId: Long, navController: NavController) {
                             fontSize = 13.sp,
                             color = TextSecondary
                         )
+                    }
+                    val tags = session?.tags
+                        ?.split(",")
+                        ?.map { it.trim() }
+                        ?.filter { it.isNotBlank() }
+                        .orEmpty()
+                    if (tags.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            tags.take(3).forEach { tag ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFFEAF2FF))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = tag.replaceFirstChar { it.uppercase() },
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF245B9D),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -205,7 +345,7 @@ fun RecordingDetailScreen(sessionId: Long, navController: NavController) {
                         .padding(horizontal = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(28.dp)
                 ) {
-                    detailTabs.forEach { tab ->
+                    (detailTabs + audioTabLabel).forEach { tab ->
                         DetailTabItem(
                             label = tab,
                             isSelected = selectedTab == tab,
@@ -262,15 +402,38 @@ fun RecordingDetailScreen(sessionId: Long, navController: NavController) {
             Spacer(Modifier.height(16.dp))
             when (selectedTab) {
                 "Questions" -> QuestionsTab()
-                "Notes" -> NotesTab(summary = summary, onRetry = { vm.generateSummary(sessionId) })
+                "Notes" -> NotesTab(summary = summary, onRegenerate = { vm.generateSummary(sessionId) })
                 "Transcript" -> TranscriptTab(
                     transcripts = transcripts,
                     session = session,
                     context = context
                 )
+                audioTabLabel -> AudioTab(session = session, context = context)
             }
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete recording?") },
+            text = { Text("This will permanently remove this recording and its generated data.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        vm.deleteSession(sessionId)
+                        showDeleteDialog = false
+                        navController.popBackStack()
+                    }
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -293,6 +456,74 @@ private fun DetailTabItem(label: String, isSelected: Boolean, onClick: () -> Uni
                 .height(2.dp)
                 .background(if (isSelected) TabSelected else Color.Transparent)
         )
+    }
+}
+
+@Composable
+private fun AudioTab(
+    session: com.example.twinmind2.data.entity.RecordingSession?,
+    context: Context
+) {
+    val audioPath = session?.completeAudioPath
+    if (audioPath.isNullOrBlank()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Complete audio will appear here after recording finishes.",
+                fontSize = 14.sp,
+                color = TextSecondary
+            )
+        }
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(
+            text = "Full Recording",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = TextPrimary
+        )
+//        Text(
+//            text = "Path: $audioPath",
+//            fontSize = 12.sp,
+//            color = TextSecondary
+//        )
+        Button(
+            onClick = {
+                val file = java.io.File(audioPath)
+                if (!file.exists()) return@Button
+                val uri = FileProvider.getUriForFile(
+                    context,
+                    context.packageName + ".provider",
+                    file
+                )
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "audio/wav")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                val resInfoList = context.packageManager.queryIntentActivities(
+                    intent,
+                    PackageManager.MATCH_DEFAULT_ONLY
+                )
+                resInfoList.forEach { resolveInfo ->
+                    context.grantUriPermission(
+                        resolveInfo.activityInfo.packageName,
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                }
+                if (resInfoList.isNotEmpty()) {
+                    context.startActivity(intent)
+                }
+            }
+        ) {
+            Text("Open Full Audio")
+        }
     }
 }
 
@@ -342,7 +573,7 @@ private fun QuestionsTab() {
 // --- Notes (Summary) Tab ---
 
 @Composable
-private fun NotesTab(summary: Summary?, onRetry: () -> Unit) {
+private fun NotesTab(summary: Summary?, onRegenerate: () -> Unit) {
     Column {
         // Share banner
         Box(
@@ -394,6 +625,22 @@ private fun NotesTab(summary: Summary?, onRetry: () -> Unit) {
         }
 
         Spacer(Modifier.height(16.dp))
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            Icon(
+                imageVector = Icons.Default.Repeat,
+                contentDescription = "Regenerate summary",
+                tint = TextSecondary,
+                modifier = Modifier
+                    .size(20.dp)
+                    .clickable { onRegenerate() }
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
 
         when (summary?.status) {
             null, "idle" -> {
@@ -427,7 +674,7 @@ private fun NotesTab(summary: Summary?, onRetry: () -> Unit) {
                         tint = StatusError,
                         modifier = Modifier
                             .size(20.dp)
-                            .clickable { onRetry() }
+                            .clickable { onRegenerate() }
                     )
                 }
                 if (summary.sectionsCompleted > 0) {
@@ -549,7 +796,7 @@ private fun SummaryDetailCard(
                     .map { it.trim().trimStart('-', '*', '•').trim() }
                     .filter { it.isNotBlank() }
                 if (items.isEmpty()) {
-                    Text(content, fontSize = 14.sp, color = TextPrimary, lineHeight = 22.sp)
+                    MarkdownBoldText(content)
                 } else {
                     items.forEach { item ->
                         Row(
@@ -564,20 +811,46 @@ private fun SummaryDetailCard(
                                     .background(Brush.linearGradient(accentGradient))
                             )
                             Spacer(Modifier.width(10.dp))
-                            Text(
+                            MarkdownBoldText(
                                 text = item,
-                                fontSize = 14.sp,
-                                color = TextPrimary,
-                                lineHeight = 22.sp,
                                 modifier = Modifier.weight(1f)
                             )
                         }
                     }
                 }
             }
-            else -> Text(content, fontSize = 14.sp, color = TextPrimary, lineHeight = 22.sp)
+            else -> MarkdownBoldText(content)
         }
     }
+}
+
+@Composable
+private fun MarkdownBoldText(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    val annotated = buildAnnotatedString {
+        val regex = Regex("\\*\\*(.+?)\\*\\*")
+        var cursor = 0
+        regex.findAll(text).forEach { match ->
+            val start = match.range.first
+            val end = match.range.last + 1
+            if (start > cursor) append(text.substring(cursor, start))
+            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                append(match.groupValues[1])
+            }
+            cursor = end
+        }
+        if (cursor < text.length) append(text.substring(cursor))
+    }
+
+    Text(
+        text = annotated,
+        fontSize = 14.sp,
+        color = TextPrimary,
+        lineHeight = 22.sp,
+        modifier = modifier
+    )
 }
 
 // --- Transcript Tab ---

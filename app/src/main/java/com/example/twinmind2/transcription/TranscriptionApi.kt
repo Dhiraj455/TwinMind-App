@@ -45,14 +45,14 @@ interface TranscriptionApi {
         val mime_types: List<String>
     )
 
-    data class FileUploadResponse(
-        val file: FileMetadata?
-    )
+//    data class FileUploadResponse(
+//        val file: FileMetadata?
+//    )
 
-    data class FileMetadata(
-        val uri: String,
-        val mime_type: String
-    )
+//    data class FileMetadata(
+//        val uri: String,
+//        val mime_type: String
+//    )
 
     data class GenerateContentRequest(
         val contents: List<Content>,

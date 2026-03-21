@@ -1,11 +1,9 @@
 package com.example.twinmind2.transcription
 
-import android.content.Context
 import com.example.twinmind2.data.dao.TranscriptDao
 import com.example.twinmind2.data.entity.AudioChunk
 import com.example.twinmind2.data.entity.Transcript
 import com.example.twinmind2.di.NetworkModule
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -20,10 +18,9 @@ import javax.inject.Singleton
 class TranscriptionRepository @Inject constructor(
     private val transcriptDao: TranscriptDao,
     private val transcriptionApi: TranscriptionApi,
-    @ApplicationContext private val context: Context,
     private val okHttpClient: OkHttpClient
 ) {
-    private val apiKey = NetworkModule.getGeminiApiKey(context)
+    private val apiKey = NetworkModule.getGeminiApiKey()
     fun observeTranscriptsForSession(sessionId: Long): Flow<List<Transcript>> =
         transcriptDao.observeTranscriptsForSession(sessionId)
 
@@ -160,7 +157,7 @@ class TranscriptionRepository @Inject constructor(
                             ),
                             TranscriptionApi.Part(
                                 file_data = null,
-                                text = "Transcribe this audio file into text. Return only the transcription without any additional commentary."
+                                text = "Transcribe this audio file into text. If multiple speakers are present, identify and label them as Speaker 1, Speaker 2, etc. Format each speaker change on a new line prefixed with the speaker label (for example: 'Speaker 1: ...'). If only one speaker is detected, transcribe normally without speaker labels. Return only the transcription text without any additional commentary."
                             )
                         )
                     )
@@ -239,15 +236,92 @@ class TranscriptionRepository @Inject constructor(
         }
     }
 
-    suspend fun updateTranscriptSuccess(sessionId: Long, chunkId: Long, text: String) {
+//    suspend fun updateTranscriptSuccess(sessionId: Long, chunkId: Long, text: String) {
+//        val transcript = transcriptDao.getTranscriptForChunk(sessionId, chunkId) ?: return
+//
+//        val updated = transcript.copy(
+//            rawText = text,
+//            text = text,
+//            status = "completed",
+//            completedAtMs = System.currentTimeMillis()
+//        )
+//        transcriptDao.updateTranscript(updated)
+//    }
+
+    suspend fun updateTranscriptSuccess(
+        sessionId: Long,
+        chunkId: Long,
+        rawText: String,
+        cleanedText: String
+    ) {
         val transcript = transcriptDao.getTranscriptForChunk(sessionId, chunkId) ?: return
-        
         val updated = transcript.copy(
-            text = text,
+            rawText = rawText,
+            text = cleanedText,
             status = "completed",
             completedAtMs = System.currentTimeMillis()
         )
         transcriptDao.updateTranscript(updated)
+    }
+
+    suspend fun contextCorrectTranscript(sessionId: Long, rawTranscript: String): Result<String> {
+        return try {
+            val priorContext = transcriptDao.getTranscriptsForSession(sessionId)
+                .filter { it.status == "completed" }
+                .map { it.text }
+                .filter { it.isNotBlank() }
+                .takeLast(3)
+                .joinToString("\n")
+
+            val contextSection = if (priorContext.isBlank()) {
+                "No prior context available."
+            } else {
+                priorContext
+            }
+
+            val request = TranscriptionApi.GenerateContentRequest(
+                contents = listOf(
+                    TranscriptionApi.Content(
+                        parts = listOf(
+                            TranscriptionApi.Part(
+                                text = """
+You are correcting speech-to-text output for meeting transcripts.
+Fix obvious spelling/word-choice mistakes caused by accent or pronunciation while preserving original meaning.
+Do not add facts. Do not rewrite style heavily. Keep speaker labels if present.
+If uncertain, keep the original wording instead of guessing.
+
+Previous meeting context:
+$contextSection
+
+Transcript to correct:
+$rawTranscript
+                                """.trimIndent()
+                            )
+                        )
+                    )
+                ),
+                generationConfig = TranscriptionApi.GenerationConfig(
+                    response_mime_type = "text/plain"
+                )
+            )
+
+            val response = transcriptionApi.generateContent(apiKey, request)
+            if (response.isSuccessful && response.body() != null) {
+                val corrected = response.body()?.candidates
+                    ?.firstOrNull()
+                    ?.content
+                    ?.parts
+                    ?.firstOrNull { !it.text.isNullOrBlank() }
+                    ?.text
+                    ?.trim()
+                    .orEmpty()
+                if (corrected.isBlank()) Result.success(rawTranscript) else Result.success(corrected)
+            } else {
+                Result.success(rawTranscript)
+            }
+        } catch (_: Exception) {
+            Result.success(rawTranscript)
+        }
     }
 
     suspend fun updateTranscriptFailure(sessionId: Long, chunkId: Long, errorMessage: String) {
@@ -262,10 +336,26 @@ class TranscriptionRepository @Inject constructor(
 
     suspend fun getPendingTranscripts(): List<Transcript> = transcriptDao.getPendingTranscripts()
 
-    suspend fun getPendingTranscriptsForSession(sessionId: Long): List<Transcript> =
-        transcriptDao.getPendingTranscriptsForSession(sessionId)
+//    suspend fun getPendingTranscriptsForSession(sessionId: Long): List<Transcript> =
+//        transcriptDao.getPendingTranscriptsForSession(sessionId)
 
     suspend fun getTranscriptForChunk(sessionId: Long, chunkId: Long): Transcript? =
         transcriptDao.getTranscriptForChunk(sessionId, chunkId)
+
+    suspend fun getTranscriptsForSession(sessionId: Long): List<Transcript> =
+        transcriptDao.getTranscriptsForSession(sessionId)
+
+    suspend fun insertCombinedTranscript(sessionId: Long, combinedText: String): Long {
+        val transcript = Transcript(
+            sessionId = sessionId,
+            chunkId = 1L,
+            chunkIndex = 0,
+            rawText = combinedText,
+            text = combinedText,
+            status = "completed",
+            completedAtMs = System.currentTimeMillis()
+        )
+        return transcriptDao.insertTranscript(transcript)
+    }
 }
 

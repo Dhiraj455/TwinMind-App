@@ -33,6 +33,9 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="android.media.AUDIO_BECOMING_NOISY" />
+                <action android:name="android.intent.action.HEADSET_PLUG" />
+                <action android:name="android.bluetooth.headset.profile.action.CONNECTION_STATE_CHANGED" />
+                <action android:name="android.media.ACTION_SCO_AUDIO_STATE_UPDATED" />
             </intent-filter>
         </receiver>
 

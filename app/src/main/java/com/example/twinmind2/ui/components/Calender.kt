@@ -85,13 +85,20 @@ fun ComingUpSection(onViewAllClick: () -> Unit = {}, onCalendarClick: () -> Unit
                     )
                 }
                 Spacer(Modifier.width(14.dp))
-                Text(
-                    text = "No upcoming events found, manage your calendars",
-                    fontSize = 14.sp,
-                    color = TextSecondary,
-                    modifier = Modifier.weight(1f),
-                    lineHeight = 20.sp
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Connect Calendar",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary,
+                        lineHeight = 20.sp
+                    )
+                    Text(
+                        text = "Upcoming meetings will appear here",
+                        fontSize = 12.sp,
+                        color = TextSecondary
+                    )
+                }
                 Spacer(Modifier.width(8.dp))
                 Icon(
                     imageVector = Icons.Default.ArrowForwardIos,

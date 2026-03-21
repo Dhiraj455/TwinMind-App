@@ -4,7 +4,14 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.WorkManager
+import com.example.twinmind2.data.dao.SummaryDao
+import com.example.twinmind2.recording.RecordingRecoveryWorker
+import com.example.twinmind2.summary.SummaryWorker
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -12,6 +19,11 @@ class TwinMindApp : Application(), Configuration.Provider {
 
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
+
+    @Inject
+    lateinit var summaryDao: SummaryDao
+
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     init {
         android.util.Log.d("TwinMindApp", "TwinMindApp init block")
@@ -34,6 +46,8 @@ class TwinMindApp : Application(), Configuration.Provider {
                 if (::workerFactory.isInitialized) {
                     android.util.Log.d("TwinMindApp", "Factory now initialized after delay - initializing WorkManager")
                     initializeWorkManager()
+                    RecordingRecoveryWorker.enqueue(this@TwinMindApp)
+                    resumeStuckSummaries()
                 } else {
                     android.util.Log.e("TwinMindApp", "Factory STILL not initialized - Hilt setup failed!")
                 }
@@ -43,8 +57,26 @@ class TwinMindApp : Application(), Configuration.Provider {
         
         // Factory is ready - initialize WorkManager IMMEDIATELY
         initializeWorkManager()
+        RecordingRecoveryWorker.enqueue(this)
+        resumeStuckSummaries()
         
         android.util.Log.d("TwinMindApp", "=== TwinMindApp.onCreate() END ===")
+    }
+
+    private fun resumeStuckSummaries() {
+        appScope.launch {
+            try {
+                // Any summary left in 'generating' means the process was killed mid-run.
+                // Re-enqueue their workers so they complete on restart.
+                val stuckSessionIds = summaryDao.getSessionIdsByStatus("generating")
+                stuckSessionIds.forEach { sessionId ->
+                    android.util.Log.d("TwinMindApp", "Resuming stuck summary for session $sessionId")
+                    SummaryWorker.enqueue(this@TwinMindApp, sessionId, replaceExisting = true)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("TwinMindApp", "Failed to resume stuck summaries", e)
+            }
+        }
     }
 
     private fun initializeWorkManager() {

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,14 @@ plugins {
     id("org.jetbrains.kotlin.kapt")
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.hilt)
+}
+
+// Load local.properties
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        load(localPropertiesFile.inputStream())
+    }
 }
 
 android {
@@ -19,6 +29,13 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Inject API key from local.properties into BuildConfig
+        buildConfigField(
+            "String",
+            "GEMINI_API_KEY",
+            "\"${localProperties.getProperty("GEMINI_API_KEY", "")}\""
+        )
     }
 
     buildTypes {
@@ -39,8 +56,15 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
+
+// ksp {
+    // Room writes schemas/com.example.twinmind2.data.AppDatabase/<version>.json
+    // Commit these files to git so every DB version is documented and testable.
+//    arg("room.schemaLocation", "$projectDir/schemas")
+// }
 
 dependencies {
 

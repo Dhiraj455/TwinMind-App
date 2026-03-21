@@ -10,7 +10,8 @@ data class RecordingSession(
     val endTimeMs: Long? = null,
     val status: String,
     val title: String? = null,
-    val completeAudioPath: String? = null
+    val completeAudioPath: String? = null,
+    val tags: String? = null
 )
 
 

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,31 +43,31 @@ fun HomeTopBar(onMenuClick: () -> Unit = {}, onDigestClick: () -> Unit = {}) {
             )
         }
 
-        Surface(
-            modifier = Modifier
-                .border(1.5.dp, ViewDigestTeal, RoundedCornerShape(20.dp))
-                .clickable { onDigestClick() },
-            shape = RoundedCornerShape(20.dp),
-            color = Color.Transparent
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Bolt,
-                    contentDescription = null,
-                    tint = ViewDigestTeal,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(Modifier.width(5.dp))
-                Text(
-                    text = "View Digest",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = ViewDigestTeal
-                )
-            }
-        }
+//        Surface(
+//            modifier = Modifier
+//                .border(1.5.dp, ViewDigestTeal, RoundedCornerShape(20.dp))
+//                .clickable { onDigestClick() },
+//            shape = RoundedCornerShape(20.dp),
+//            color = Color.Transparent
+//        ) {
+//            Row(
+//                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+//                verticalAlignment = Alignment.CenterVertically
+//            ) {
+//                Icon(
+//                    imageVector = Icons.Default.Bolt,
+//                    contentDescription = null,
+//                    tint = ViewDigestTeal,
+//                    modifier = Modifier.size(16.dp)
+//                )
+//                Spacer(Modifier.width(5.dp))
+//                Text(
+//                    text = "View Digest",
+//                    fontSize = 14.sp,
+//                    fontWeight = FontWeight.SemiBold,
+//                    color = ViewDigestTeal
+//                )
+//            }
+//        }
     }
 }

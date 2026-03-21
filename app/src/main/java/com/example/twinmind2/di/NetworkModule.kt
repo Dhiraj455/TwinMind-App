@@ -1,5 +1,6 @@
 package com.example.twinmind2.di
 
+import com.example.twinmind2.BuildConfig
 import com.example.twinmind2.transcription.TranscriptionApi
 import dagger.Module
 import dagger.Provides
@@ -22,7 +23,6 @@ object NetworkModule {
         val logging = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY
         }
-        
         return OkHttpClient.Builder()
             .addInterceptor(logging)
             .build()
@@ -43,17 +43,7 @@ object NetworkModule {
     fun provideTranscriptionApi(retrofit: Retrofit): TranscriptionApi {
         return retrofit.create(TranscriptionApi::class.java)
     }
-    
-    fun getGeminiApiKey(context: android.content.Context): String {
-        // Hardcoded Google Gemini API key
-        // Get a new key from: https://aistudio.google.com/app/apikey
-        val hardcodedApiKey = "Your_Google_API_Key"
 
-        // Try to get from SharedPreferences first, fallback to hardcoded
-        val prefs = context.getSharedPreferences("twinmind_prefs", android.content.Context.MODE_PRIVATE)
-        val savedKey = prefs.getString("gemini_api_key", "")?.takeIf { it.isNotEmpty() }
-        
-        return savedKey ?: hardcodedApiKey
-    }
+    fun getGeminiApiKey(): String = BuildConfig.GEMINI_API_KEY
 }
 

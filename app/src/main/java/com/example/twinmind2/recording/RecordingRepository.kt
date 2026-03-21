@@ -42,7 +42,42 @@ class RecordingRepository(
 
     fun observeSessions(): Flow<List<RecordingSession>> = dao.observeSessions()
 
+    fun searchSessions(query: String): Flow<List<RecordingSession>> = dao.searchSessions(query)
+
+    suspend fun getSession(sessionId: Long): RecordingSession? = dao.getSession(sessionId)
+
+    suspend fun renameSessionTitle(sessionId: Long, newTitle: String) {
+        val current = dao.getSession(sessionId) ?: return
+        dao.updateSession(current.copy(title = newTitle))
+        val existingSummary = summaryDao.getSummary(sessionId)
+        if (existingSummary != null) {
+            summaryDao.insert(
+                existingSummary.copy(
+                    title = newTitle,
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    suspend fun createCombinedSession(title: String = "Combined Recording"): Long {
+        val now = System.currentTimeMillis()
+        return dao.insertSession(
+            RecordingSession(
+                startTimeMs = now,
+                endTimeMs = now,
+                status = "combined",
+                title = title,
+                tags = "combined"
+            )
+        )
+    }
+
     fun observeChunks(sessionId: Long): Flow<List<AudioChunk>> = dao.observeChunks(sessionId)
+
+//    suspend fun deleteChunkById(chunkId: Long) {
+//        dao.deleteChunkById(chunkId)
+//    }
 
     suspend fun addChunk(
         sessionId: Long,
@@ -94,6 +129,10 @@ class RecordingRepository(
         if (sessionDir.exists()) {
             sessionDir.deleteRecursively()
         }
+    }
+
+    suspend fun deleteSessions(sessionIds: Collection<Long>) {
+        sessionIds.forEach { deleteSession(it) }
     }
 }
 

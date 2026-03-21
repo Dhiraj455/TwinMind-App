@@ -12,7 +12,7 @@ import com.example.twinmind2.data.entity.Transcript
 
 @Database(
     entities = [RecordingSession::class, AudioChunk::class, Transcript::class, Summary::class],
-    version = 4,
+    version = 6,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

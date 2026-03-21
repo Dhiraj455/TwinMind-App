@@ -2,6 +2,9 @@ package com.example.twinmind2.di
 
 import android.content.Context
 import androidx.room.Room
+// Production imports — uncomment when switching to the production-safe setup below
+// import com.example.twinmind2.BuildConfig
+// import com.example.twinmind2.data.ALL_MIGRATIONS
 import com.example.twinmind2.data.AppDatabase
 import com.example.twinmind2.data.dao.RecordingDao
 import com.example.twinmind2.data.dao.SummaryDao
@@ -25,8 +28,15 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "twinmind.db")
-            .fallbackToDestructiveMigration()
+            .fallbackToDestructiveMigration() 
             .build()
+
+    // FOR PRODUCTION 
+    // fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
+    //     Room.databaseBuilder(context, AppDatabase::class.java, "twinmind.db")
+    //         .addMigrations(*ALL_MIGRATIONS)
+    //         .apply { if (BuildConfig.DEBUG) fallbackToDestructiveMigration() }
+    //         .build()
 
     @Provides
     fun provideRecordingDao(db: AppDatabase): RecordingDao = db.recordingDao()
@@ -52,18 +62,19 @@ object AppModule {
     fun provideTranscriptionRepository(
         transcriptDao: TranscriptDao,
         transcriptionApi: TranscriptionApi,
-        @ApplicationContext context: Context,
         okHttpClient: OkHttpClient
-    ): TranscriptionRepository = TranscriptionRepository(transcriptDao, transcriptionApi, context, okHttpClient)
-
+    ): TranscriptionRepository = TranscriptionRepository(transcriptDao, transcriptionApi, okHttpClient)
++
     @Provides
     @Singleton
     fun provideSummaryRepository(
+        recordingDao: RecordingDao,
         summaryDao: SummaryDao,
         transcriptDao: TranscriptDao,
         transcriptionApi: TranscriptionApi,
         @ApplicationContext context: Context
-    ): SummaryRepository = SummaryRepository(context, summaryDao, transcriptDao, transcriptionApi)
+    ): SummaryRepository =
+        SummaryRepository(context, recordingDao, summaryDao, transcriptDao, transcriptionApi)
 }
 
 

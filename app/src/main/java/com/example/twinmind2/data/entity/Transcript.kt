@@ -13,6 +13,7 @@ data class Transcript(
     val sessionId: Long,
     val chunkId: Long, // Reference to AudioChunk.id
     val chunkIndex: Int, // indexInSession for ordering
+    val rawText: String? = null, // Original model output before context cleanup
     val text: String,
     val status: String, // pending, completed, failed
     val errorMessage: String? = null,

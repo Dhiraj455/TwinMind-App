@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,16 +30,25 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -47,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -76,6 +87,7 @@ import com.example.twinmind2.ui.screens.RecordingDetailScreen
 import com.example.twinmind2.ui.screens.TodoScreen
 import com.example.twinmind2.ui.theme.TwinMind2Theme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -138,120 +150,230 @@ class MainActivity : ComponentActivity() {
         val vm: RecordingViewModel = hiltViewModel()
         val state = vm.recordingState.collectAsState()
         val scrollState = rememberScrollState()
+        val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+        val scope = rememberCoroutineScope()
+        val showStartRecordingDialog = remember { mutableStateOf(false) }
 
-        Scaffold(
-            modifier = modifier.fillMaxSize(),
-            containerColor = BackgroundHome,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            bottomBar = {
-                if (state.value.activeSessionId != null) {
-                    val elapsed = state.value.elapsedSec
-                    val mm = (elapsed / 60).toString().padStart(2, '0')
-                    val ss = (elapsed % 60).toString().padStart(2, '0')
-
-                    Box(
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet(
+                    drawerContainerColor = Color.White
+                ) {
+                    Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                            .width(280.dp)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 20.dp, vertical = 20.dp)
                     ) {
-                        Row(
+                        Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(62.dp)
-                                .shadow(10.dp, RoundedCornerShape(31.dp))
-                                .clip(RoundedCornerShape(31.dp))
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(RecordingPillDark, RecordingPillMid)
-                                    )
-                                )
-                                .padding(horizontal = 18.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Live waveform bars
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                listOf(10.dp, 18.dp, 12.dp, 20.dp, 14.dp).forEach { h ->
-                                    Box(
-                                        modifier = Modifier
-                                            .width(3.dp)
-                                            .height(h)
-                                            .background(
-                                                Brush.verticalGradient(
-                                                    listOf(Color(0xFF8E54E9), Color(0xFF4776E6))
-                                                ),
-                                                RoundedCornerShape(2.dp)
-                                            )
-                                    )
-                                }
-                            }
+                                .size(60.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFEFF3F5))
+                        )
 
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    text = "$mm:$ss",
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color.White,
-                                    maxLines = 1
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                Icon(
-                                    imageVector = Icons.Filled.ArrowDropDown,
-                                    contentDescription = null,
-                                    tint = Color.White.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                        Spacer(Modifier.height(14.dp))
+                        Text(
+                            text = "Dhiraj Shelke",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF0D5A79),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
 
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White)
-                                    .clickable {
-                                        val intent = Intent(
-                                            this@MainActivity, RecordingService::class.java
-                                        ).setAction(RecordingNotifications.ACTION_STOP)
-                                        startService(intent)
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(16.dp)
-                                        .clip(RoundedCornerShape(3.dp))
-                                        .background(RecordingRed)
-                                )
-                            }
-                        }
+//                        Spacer(Modifier.height(24.dp))
+//                        Box(
+//                            modifier = Modifier
+//                                .fillMaxWidth()
+//                                .height(56.dp)
+//                                .clip(RoundedCornerShape(28.dp))
+//                                .background(Color(0xFFF6F8F9))
+//                        )
+
+//                        Spacer(Modifier.height(20.dp))
+//                        repeat(4) {
+//                            Box(
+//                                modifier = Modifier
+//                                    .fillMaxWidth()
+//                                    .height(22.dp)
+//                                    .clip(RoundedCornerShape(12.dp))
+//                                    .background(Color(0xFFF6F8F9))
+//                            )
+//                            Spacer(Modifier.height(18.dp))
+//                        }
+
+//                        Box(
+//                            modifier = Modifier
+//                                .fillMaxWidth()
+//                                .height(160.dp)
+//                                .clip(RoundedCornerShape(16.dp))
+//                                .background(Color(0xFFF6F8F9))
+//                        )
+
+//                        Spacer(Modifier.height(20.dp))
+//                        repeat(2) {
+//                            Box(
+//                                modifier = Modifier
+//                                    .fillMaxWidth()
+//                                    .height(22.dp)
+//                                    .clip(RoundedCornerShape(12.dp))
+//                                    .background(Color(0xFFF6F8F9))
+//                            )
+//                            Spacer(Modifier.height(18.dp))
+//                        }
                     }
-                } else {
-                    BottomActionButtons(
-                        currentlyRecording = false,
-                        onRecordClick = {
-                            val intent = Intent(this@MainActivity, RecordingService::class.java)
-                            if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
-                        },
-                    )
                 }
             }
-        ) { innerPadding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .verticalScroll(scrollState)
-            ) {
-                HomeTopBar()
+        ) {
+            Scaffold(
+                modifier = modifier.fillMaxSize(),
+                containerColor = BackgroundHome,
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                bottomBar = {
+                    if (state.value.activeSessionId != null) {
+                        val elapsed = state.value.elapsedSec
+                        val mm = (elapsed / 60).toString().padStart(2, '0')
+                        val ss = (elapsed % 60).toString().padStart(2, '0')
 
-                Spacer(Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(62.dp)
+                                    .shadow(10.dp, RoundedCornerShape(31.dp))
+                                    .clip(RoundedCornerShape(31.dp))
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(RecordingPillDark, RecordingPillMid)
+                                        )
+                                    )
+                                    .padding(horizontal = 18.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Live waveform bars
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    listOf(10.dp, 18.dp, 12.dp, 20.dp, 14.dp).forEach { h ->
+                                        Box(
+                                            modifier = Modifier
+                                                .width(3.dp)
+                                                .height(h)
+                                                .background(
+                                                    Brush.verticalGradient(
+                                                        listOf(Color(0xFF8E54E9), Color(0xFF4776E6))
+                                                    ),
+                                                    RoundedCornerShape(2.dp)
+                                                )
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = "$mm:$ss",
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White,
+                                        maxLines = 1
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Icon(
+                                        imageVector = Icons.Filled.ArrowDropDown,
+                                        contentDescription = null,
+                                        tint = Color.White.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.White)
+                                            .clickable {
+                                                val action = if (state.value.isPaused) {
+                                                    RecordingNotifications.ACTION_RESUME
+                                                } else {
+                                                    RecordingNotifications.ACTION_PAUSE
+                                                }
+                                                val intent = Intent(
+                                                    this@MainActivity,
+                                                    RecordingService::class.java
+                                                ).setAction(action)
+                                                startService(intent)
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = if (state.value.isPaused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                                            contentDescription = if (state.value.isPaused) "Resume recording" else "Pause recording",
+                                            tint = Color(0xFF1A1A1A),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clip(CircleShape)
+                                            .background(Color.White)
+                                            .clickable {
+                                                val intent = Intent(
+                                                    this@MainActivity, RecordingService::class.java
+                                                ).setAction(RecordingNotifications.ACTION_STOP)
+                                                startService(intent)
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(16.dp)
+                                                .clip(RoundedCornerShape(3.dp))
+                                                .background(RecordingRed)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        BottomActionButtons(
+                            currentlyRecording = false,
+                            onRecordClick = {
+                                showStartRecordingDialog.value = true
+                            },
+                        )
+                    }
+                }
+            ) { innerPadding ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .verticalScroll(scrollState)
+                ) {
+                    HomeTopBar(
+                        onMenuClick = { scope.launch { drawerState.open() } }
+                    )
+
+                    Spacer(Modifier.height(8.dp))
 
                 // Greeting + promo text
                 Column(modifier = Modifier.padding(horizontal = 20.dp)) {
@@ -261,22 +383,22 @@ class MainActivity : ComponentActivity() {
                                 append("Hey Dhiraj Shelke,\n")
                             }
                             withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 22.sp, color = TwinMindDark)) {
-                                append("Capture 5 notes to unlock\nTwinMind Pro for free")
+                                append("Welcome to TwinMind")
                             }
                         },
                         lineHeight = 30.sp
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .border(1.5.dp, DividerGray, CircleShape)
-                            .clickable {},
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(">", fontSize = 14.sp, color = TextSecondary)
-                    }
+//                    Spacer(Modifier.height(4.dp))
+//                    Box(
+//                        modifier = Modifier
+//                            .size(28.dp)
+//                            .clip(CircleShape)
+//                            .border(1.5.dp, DividerGray, CircleShape)
+//                            .clickable {},
+//                        contentAlignment = Alignment.Center
+//                    ) {
+//                        Text(">", fontSize = 14.sp, color = TextSecondary)
+//                    }
                 }
 
                 Spacer(Modifier.height(28.dp))
@@ -330,7 +452,30 @@ class MainActivity : ComponentActivity() {
                 // Coming Up
                 ComingUpSection()
 
-                Spacer(Modifier.height(80.dp))
+                    Spacer(Modifier.height(80.dp))
+                }
+            }
+
+            if (showStartRecordingDialog.value) {
+                AlertDialog(
+                    onDismissRequest = { showStartRecordingDialog.value = false },
+                    title = { Text("Start recording?") },
+                    text = { Text("Do you want to start capturing now?") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showStartRecordingDialog.value = false
+                                val intent = Intent(this@MainActivity, RecordingService::class.java)
+                                if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+                            }
+                        ) { Text("Start") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showStartRecordingDialog.value = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
             }
         }
 
