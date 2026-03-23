@@ -81,9 +81,9 @@ interface TranscriptionApi {
         val finishReason: String? = null
     )
 
-    data class TranscriptionResponse(
-        val text: String,
-        val language: String? = null
-    )
+//    data class TranscriptionResponse(
+//        val text: String,
+//        val language: String? = null
+//    )
 }
 

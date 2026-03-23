@@ -58,6 +58,15 @@ android {
         compose = true
         buildConfig = true
     }
+    androidResources {
+        // Vosk model files - don't compress for faster extraction
+        noCompress += listOf("mdl", "fst", "int", "mat", "dubm", "ie", "stats", "conf")
+    }
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
 }
 
 // ksp {
@@ -95,6 +104,11 @@ dependencies {
     implementation(libs.okhttp.core)
     implementation(libs.okhttp.logging)
     implementation(libs.gson)
+    implementation(libs.vosk.android) {
+        exclude(group = "net.java.dev.jna", module = "jna")
+    }
+    // JNA @aar only — avoids duplicate classes between jna jar and jna-runtime (Vosk's transitive dep)
+    implementation("net.java.dev.jna:jna:5.13.0@aar")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

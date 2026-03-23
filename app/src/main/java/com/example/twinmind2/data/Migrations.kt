@@ -15,31 +15,36 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  *  3. Add MIGRATION_N_(N+1) below describing the SQL change.
  *  4. Add it to ALL_MIGRATIONS at the bottom.
  *  5. Build — Room will write schemas/<version>.json automatically.
- *
- * Common SQL patterns:
- *   ADD column:    ALTER TABLE foo ADD COLUMN bar TEXT
- *   ADD NOT NULL:  ALTER TABLE foo ADD COLUMN bar INTEGER NOT NULL DEFAULT 0
- *   NEW table:     CREATE TABLE IF NOT EXISTS ...
- *   DROP column:   requires create-copy-drop approach (SQLite has no DROP COLUMN pre-API 35)
  */
 
-// ─── Example: next migration when you bump from 6 → 7 ────────────────────────
-//
-// val MIGRATION_6_7 = object : Migration(6, 7) {
-//     override fun migrate(db: SupportSQLiteDatabase) {
-//         // Example: add a nullable column to recording_sessions
-//         db.execSQL("ALTER TABLE recording_sessions ADD COLUMN location TEXT")
-//     }
-// }
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS chat_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                title TEXT NOT NULL,
+                type TEXT NOT NULL,
+                recordingSessionId INTEGER,
+                createdAt INTEGER NOT NULL,
+                lastMessageAt INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                chatSessionId INTEGER NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                createdAt INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+    }
+}
 
-// ─── Register every migration in this array ───────────────────────────────────
-//
-// val ALL_MIGRATIONS = arrayOf(
-//     MIGRATION_6_7,
-// )
-
-/**
- * Empty placeholder until the first post-launch migration is needed.
- * Replace with the real array once you have migrations.
- */
-val ALL_MIGRATIONS: Array<Migration> = emptyArray()
+val ALL_MIGRATIONS: Array<Migration> = arrayOf(
+    MIGRATION_6_7
+)

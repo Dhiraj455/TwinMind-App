@@ -33,5 +33,8 @@ interface TranscriptDao {
 
     @Query("DELETE FROM transcripts WHERE sessionId = :sessionId")
     suspend fun deleteTranscriptsForSession(sessionId: Long)
+
+    @Query("SELECT * FROM transcripts WHERE status = 'completed' ORDER BY sessionId ASC, chunkIndex ASC")
+    suspend fun getAllCompletedTranscripts(): List<Transcript>
 }
 

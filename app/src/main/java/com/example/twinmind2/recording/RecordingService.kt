@@ -76,6 +76,12 @@ class RecordingService : Service() {
         }
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        requestedStop = true
+        stopSelfSafely()
+    }
+
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
@@ -113,8 +119,11 @@ class RecordingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             RecordingNotifications.ACTION_STOP -> {
-                // Request graceful stop to flush the last partial chunk
                 requestedStop = true
+                if (recordJob == null) {
+                    sendBroadcast(Intent(RecordingNotifications.ACTION_RECORDING_STOPPED).setPackage(packageName))
+                    stopSelf()
+                }
                 return START_STICKY
             }
             RecordingNotifications.ACTION_PAUSE -> {
@@ -253,7 +262,7 @@ class RecordingService : Service() {
                         val rms = rms(buffer, read)
                         if (rms < 200) {
                             silentAccumulatedMs += (read * 1000L) / (sampleRate)
-                            if (silentAccumulatedMs >= 10_000L && !silenceAlertShown) {
+                            if (silentAccumulatedMs >= 10000L && !silenceAlertShown) {
                                 silenceAlertShown = true
                                 repository.setStatus("No audio detected - Check microphone")
                                 updateNotification("No audio detected - Check microphone")
@@ -588,8 +597,8 @@ class RecordingService : Service() {
         timerJob?.cancel()
         telephonyManager?.listen(phoneListener, PhoneStateListener.LISTEN_NONE)
         abandonAudioFocus()
-        // Ensure UI updates immediately even if recording loop finalizer didn't run yet
         repository.clearActive()
+        sendBroadcast(Intent(RecordingNotifications.ACTION_RECORDING_STOPPED).setPackage(packageName))
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }

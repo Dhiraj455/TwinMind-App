@@ -2,10 +2,8 @@ package com.example.twinmind2.di
 
 import android.content.Context
 import androidx.room.Room
-// Production imports — uncomment when switching to the production-safe setup below
-// import com.example.twinmind2.BuildConfig
-// import com.example.twinmind2.data.ALL_MIGRATIONS
 import com.example.twinmind2.data.AppDatabase
+import com.example.twinmind2.data.dao.ChatDao
 import com.example.twinmind2.data.dao.RecordingDao
 import com.example.twinmind2.data.dao.SummaryDao
 import com.example.twinmind2.data.dao.TranscriptDao
@@ -28,10 +26,10 @@ object AppModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "twinmind.db")
-            .fallbackToDestructiveMigration() 
+            .fallbackToDestructiveMigration()
             .build()
 
-    // FOR PRODUCTION 
+    // FOR PRODUCTION
     // fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
     //     Room.databaseBuilder(context, AppDatabase::class.java, "twinmind.db")
     //         .addMigrations(*ALL_MIGRATIONS)
@@ -46,6 +44,9 @@ object AppModule {
 
     @Provides
     fun provideSummaryDao(db: AppDatabase): SummaryDao = db.summaryDao()
+
+    @Provides
+    fun provideChatDao(db: AppDatabase): ChatDao = db.chatDao()
 
     @Provides
     @Singleton
@@ -64,7 +65,7 @@ object AppModule {
         transcriptionApi: TranscriptionApi,
         okHttpClient: OkHttpClient
     ): TranscriptionRepository = TranscriptionRepository(transcriptDao, transcriptionApi, okHttpClient)
-+
+
     @Provides
     @Singleton
     fun provideSummaryRepository(
@@ -76,5 +77,3 @@ object AppModule {
     ): SummaryRepository =
         SummaryRepository(context, recordingDao, summaryDao, transcriptDao, transcriptionApi)
 }
-
-

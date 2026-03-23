@@ -53,13 +53,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.example.twinmind2.chat.ChatViewModel
+import com.example.twinmind2.data.entity.ChatSession
 import com.example.twinmind2.data.entity.RecordingSession
 import com.example.twinmind2.recording.RecordingViewModel
+import com.example.twinmind2.ui.theme.OrangeAccent
+import com.example.twinmind2.ui.theme.TwinMindDark
 import com.example.twinmind2.ui.theme.BackgroundHome
 import com.example.twinmind2.ui.theme.DividerGray
 import com.example.twinmind2.ui.theme.SearchBarBg
 import com.example.twinmind2.ui.theme.TabSelected
 import com.example.twinmind2.ui.theme.TextPrimary
+import com.example.twinmind2.ui.components.geminiResponseToPlainText
 import com.example.twinmind2.ui.theme.TextSecondary
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -69,14 +74,29 @@ import java.util.Locale
 @Composable
 fun MemoriesScreen(navController: NavController) {
     val vm: RecordingViewModel = hiltViewModel()
+    val chatVm: ChatViewModel = hiltViewModel()
     val sessions by vm.searchResults.collectAsState()
+    val chatSessions by chatVm.allChatSessions.collectAsState()
     val searchQuery by vm.searchQuery.collectAsState()
-    var selectedTab by remember { mutableStateOf("Notes") }
-    var selectionMode by remember { mutableStateOf(false) }
-    var selectedSessionIds by remember { mutableStateOf(setOf<Long>()) }
-    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+
+    var selectedTab by remember { mutableStateOf("Notes") }
+
+    // Notes selection state
+    var notesSelectionMode by remember { mutableStateOf(false) }
+    var selectedNoteIds by remember { mutableStateOf(setOf<Long>()) }
+    var showDeleteNotesDialog by remember { mutableStateOf(false) }
+
+    // Chats selection state
+    var chatsSelectionMode by remember { mutableStateOf(false) }
+    var selectedChatIds by remember { mutableStateOf(setOf<Long>()) }
+    var showDeleteChatsDialog by remember { mutableStateOf(false) }
+
+    val filteredChatSessions = remember(chatSessions, searchQuery) {
+        if (searchQuery.isBlank()) chatSessions
+        else chatSessions.filter { it.title.contains(searchQuery, ignoreCase = true) }
+    }
 
     Scaffold(
         containerColor = BackgroundHome,
@@ -152,13 +172,17 @@ fun MemoriesScreen(navController: NavController) {
                 ) {
                     MemoriesTabButton("Notes", selectedTab == "Notes") {
                         selectedTab = it
-                        selectionMode = false
-                        selectedSessionIds = emptySet()
+                        notesSelectionMode = false
+                        selectedNoteIds = emptySet()
+                        chatsSelectionMode = false
+                        selectedChatIds = emptySet()
                     }
                     MemoriesTabButton("Chats", selectedTab == "Chats") {
                         selectedTab = it
-                        selectionMode = false
-                        selectedSessionIds = emptySet()
+                        notesSelectionMode = false
+                        selectedNoteIds = emptySet()
+                        chatsSelectionMode = false
+                        selectedChatIds = emptySet()
                     }
                 }
                 Spacer(Modifier.height(8.dp))
@@ -179,59 +203,136 @@ fun MemoriesScreen(navController: NavController) {
                 .padding(horizontal = 16.dp)
         ) {
             Spacer(Modifier.height(16.dp))
-            if (selectionMode) {
+
+            // Selection action bar — Notes tab
+            if (selectedTab == "Notes" && notesSelectionMode) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "${selectedSessionIds.size} selected",
+                        text = "${selectedNoteIds.size} selected",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = TextPrimary
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         TextButton(onClick = {
-                            selectionMode = false
-                            selectedSessionIds = emptySet()
+                            notesSelectionMode = false
+                            selectedNoteIds = emptySet()
                         }) { Text("Cancel") }
                         TextButton(
-                            onClick = {
-                                showDeleteConfirmDialog = true
-                            },
-                            enabled = selectedSessionIds.isNotEmpty()
+                            onClick = { showDeleteNotesDialog = true },
+                            enabled = selectedNoteIds.isNotEmpty()
                         ) { Text("Delete") }
                         TextButton(
                             onClick = {
                                 scope.launch {
-                                    val newSessionId = vm.combineSessionsToNewNote(selectedSessionIds)
-                                    selectionMode = false
-                                    selectedSessionIds = emptySet()
+                                    val newSessionId = vm.combineSessionsToNewNote(selectedNoteIds)
+                                    notesSelectionMode = false
+                                    selectedNoteIds = emptySet()
                                     if (newSessionId != null) {
                                         navController.navigate("recording/$newSessionId")
                                     }
                                 }
                             },
-                            enabled = selectedSessionIds.size >= 2
+                            enabled = selectedNoteIds.size >= 2
                         ) { Text("Combine") }
                     }
                 }
                 Spacer(Modifier.height(8.dp))
             }
-            if (selectedTab == "Chats") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 48.dp),
-                    contentAlignment = Alignment.Center
+
+            // Selection action bar — Chats tab
+            if (selectedTab == "Chats" && chatsSelectionMode) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "No chats yet.",
-                        fontSize = 15.sp,
-                        color = TextSecondary,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        text = "${selectedChatIds.size} selected",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
                     )
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TextButton(onClick = {
+                            chatsSelectionMode = false
+                            selectedChatIds = emptySet()
+                        }) { Text("Cancel") }
+                        TextButton(
+                            onClick = { showDeleteChatsDialog = true },
+                            enabled = selectedChatIds.isNotEmpty()
+                        ) { Text("Delete") }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+
+            if (selectedTab == "Chats") {
+                if (filteredChatSessions.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 48.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (searchQuery.isBlank()) "No chats yet.\nTap \"Chat with your memories\" to start." else "No chats match your search.",
+                            fontSize = 15.sp,
+                            color = TextSecondary,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            lineHeight = 22.sp
+                        )
+                    }
+                } else {
+                    val chatGrouped = filteredChatSessions.groupBy { chat ->
+                        SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(Date(chat.createdAt))
+                    }
+                    chatGrouped.entries.sortedByDescending { it.value.maxOf { s -> s.lastMessageAt } }.forEach { (dateLabel, dayChats) ->
+                        Text(
+                            text = dateLabel,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextSecondary,
+                            modifier = Modifier.padding(vertical = 10.dp)
+                        )
+                        dayChats.sortedByDescending { it.lastMessageAt }.forEach { chatSession ->
+                            ChatCard(
+                                chatSession = chatSession,
+                                selectionMode = chatsSelectionMode,
+                                selected = selectedChatIds.contains(chatSession.id),
+                                onTap = {
+                                    if (chatsSelectionMode) {
+                                        selectedChatIds = if (selectedChatIds.contains(chatSession.id)) {
+                                            selectedChatIds - chatSession.id
+                                        } else {
+                                            selectedChatIds + chatSession.id
+                                        }
+                                        if (selectedChatIds.isEmpty()) chatsSelectionMode = false
+                                    } else {
+                                        navController.navigate("chat/${chatSession.id}")
+                                    }
+                                },
+                                onLongPress = {
+                                    if (!chatsSelectionMode) {
+                                        chatsSelectionMode = true
+                                        selectedChatIds = setOf(chatSession.id)
+                                    } else {
+                                        selectedChatIds = if (selectedChatIds.contains(chatSession.id)) {
+                                            selectedChatIds - chatSession.id
+                                        } else {
+                                            selectedChatIds + chatSession.id
+                                        }
+                                        if (selectedChatIds.isEmpty()) chatsSelectionMode = false
+                                    }
+                                }
+                            )
+                            Spacer(Modifier.height(10.dp))
+                        }
+                    }
                 }
             } else if (sessions.isEmpty()) {
                 Box(
@@ -263,35 +364,31 @@ fun MemoriesScreen(navController: NavController) {
                         MemoryCard(
                             session = session,
                             vm = vm,
-                            selectionMode = selectionMode,
-                            selected = selectedSessionIds.contains(session.id),
+                            selectionMode = notesSelectionMode,
+                            selected = selectedNoteIds.contains(session.id),
                             onTap = {
-                                if (selectionMode) {
-                                    selectedSessionIds = if (selectedSessionIds.contains(session.id)) {
-                                        selectedSessionIds - session.id
+                                if (notesSelectionMode) {
+                                    selectedNoteIds = if (selectedNoteIds.contains(session.id)) {
+                                        selectedNoteIds - session.id
                                     } else {
-                                        selectedSessionIds + session.id
+                                        selectedNoteIds + session.id
                                     }
-                                    if (selectedSessionIds.isEmpty()) {
-                                        selectionMode = false
-                                    }
+                                    if (selectedNoteIds.isEmpty()) notesSelectionMode = false
                                 } else {
                                     navController.navigate("recording/${session.id}")
                                 }
                             },
                             onLongPress = {
-                                if (!selectionMode) {
-                                    selectionMode = true
-                                    selectedSessionIds = setOf(session.id)
+                                if (!notesSelectionMode) {
+                                    notesSelectionMode = true
+                                    selectedNoteIds = setOf(session.id)
                                 } else {
-                                    selectedSessionIds = if (selectedSessionIds.contains(session.id)) {
-                                        selectedSessionIds - session.id
+                                    selectedNoteIds = if (selectedNoteIds.contains(session.id)) {
+                                        selectedNoteIds - session.id
                                     } else {
-                                        selectedSessionIds + session.id
+                                        selectedNoteIds + session.id
                                     }
-                                    if (selectedSessionIds.isEmpty()) {
-                                        selectionMode = false
-                                    }
+                                    if (selectedNoteIds.isEmpty()) notesSelectionMode = false
                                 }
                             }
                         )
@@ -303,27 +400,130 @@ fun MemoriesScreen(navController: NavController) {
         }
     }
 
-    if (showDeleteConfirmDialog) {
+    // Delete Notes confirmation dialog
+    if (showDeleteNotesDialog) {
         AlertDialog(
-            onDismissRequest = { showDeleteConfirmDialog = false },
+            onDismissRequest = { showDeleteNotesDialog = false },
             title = { Text("Delete selected recordings?") },
-            text = { Text("This will permanently remove ${selectedSessionIds.size} recording(s), including transcripts and summaries.") },
+            text = { Text("This will permanently remove ${selectedNoteIds.size} recording(s), including transcripts and summaries.") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        vm.deleteSessions(selectedSessionIds)
-                        showDeleteConfirmDialog = false
-                        selectionMode = false
-                        selectedSessionIds = emptySet()
+                        vm.deleteSessions(selectedNoteIds)
+                        showDeleteNotesDialog = false
+                        notesSelectionMode = false
+                        selectedNoteIds = emptySet()
                     }
                 ) { Text("Delete") }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                TextButton(onClick = { showDeleteNotesDialog = false }) {
                     Text("Cancel")
                 }
             }
         )
+    }
+
+    // Delete Chats confirmation dialog
+    if (showDeleteChatsDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteChatsDialog = false },
+            title = { Text("Delete selected chats?") },
+            text = { Text("This will permanently remove ${selectedChatIds.size} chat(s) and all their messages.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        selectedChatIds.forEach { chatId ->
+                            chatVm.deleteChatSession(chatId)
+                        }
+                        showDeleteChatsDialog = false
+                        chatsSelectionMode = false
+                        selectedChatIds = emptySet()
+                    }
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteChatsDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ChatCard(
+    chatSession: ChatSession,
+    selectionMode: Boolean,
+    selected: Boolean,
+    onTap: () -> Unit,
+    onLongPress: () -> Unit
+) {
+    val timeStr = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(chatSession.lastMessageAt))
+    val typeLabel = when (chatSession.type) {
+        "all" -> "All memories"
+        "recording" -> "This note"
+        else -> chatSession.type
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(2.dp, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White)
+            .combinedClickable(onClick = onTap, onLongClick = onLongPress)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (selectionMode) {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = { onTap() }
+                )
+                Spacer(Modifier.width(6.dp))
+            }
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(TwinMindDark),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("✦", fontSize = 18.sp, color = OrangeAccent)
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = chatSession.title.ifBlank { "Chat" },
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary,
+                    maxLines = 2
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    text = timeStr,
+                    fontSize = 12.sp,
+                    color = TextSecondary
+                )
+                Spacer(Modifier.height(5.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xFFEAF2FF))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = typeLabel,
+                        fontSize = 11.sp,
+                        color = Color(0xFF245B9D),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -416,7 +616,7 @@ private fun MemoryCard(
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = title,
+                    text = geminiResponseToPlainText(title),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = TextPrimary,

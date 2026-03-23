@@ -27,5 +27,8 @@ interface SummaryDao {
 
     @Query("SELECT sessionId FROM summaries WHERE status = :status")
     suspend fun getSessionIdsByStatus(status: String): List<Long>
+
+    @Query("SELECT * FROM summaries WHERE status = 'completed'")
+    suspend fun getAllCompletedSummaries(): List<Summary>
 }
 

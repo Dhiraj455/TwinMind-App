@@ -7,6 +7,7 @@ import androidx.work.WorkManager
 import com.example.twinmind2.data.dao.SummaryDao
 import com.example.twinmind2.recording.RecordingRecoveryWorker
 import com.example.twinmind2.summary.SummaryWorker
+import com.example.twinmind2.wakeword.WakeWordPreferences
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +26,16 @@ class TwinMindApp : Application(), Configuration.Provider {
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    private fun startWakeWordIfPrefsOn() {
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            try {
+                WakeWordPreferences.startIfEnabled(this@TwinMindApp)
+            } catch (e: Exception) {
+                android.util.Log.e("TwinMindApp", "WakeWord startIfEnabled failed", e)
+            }
+        }
+    }
+
     init {
         android.util.Log.d("TwinMindApp", "TwinMindApp init block")
     }
@@ -33,13 +44,11 @@ class TwinMindApp : Application(), Configuration.Provider {
         super.onCreate()
         
         android.util.Log.d("TwinMindApp", "=== TwinMindApp.onCreate() START ===")
-        
-        // Hilt injection happens AFTER super.onCreate() completes
-        // So at this point, @Inject fields should be initialized
+
         android.util.Log.d("TwinMindApp", "Checking HiltWorkerFactory: initialized=${::workerFactory.isInitialized}")
         
         if (!::workerFactory.isInitialized) {
-            android.util.Log.e("TwinMindApp", "❌❌❌ FATAL: HiltWorkerFactory not initialized!")
+            android.util.Log.e("TwinMindApp", "FATAL: HiltWorkerFactory not initialized!")
             android.util.Log.e("TwinMindApp", "This means Hilt @Inject failed - check Hilt setup!")
             // Try again after a brief delay
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
@@ -48,10 +57,12 @@ class TwinMindApp : Application(), Configuration.Provider {
                     initializeWorkManager()
                     RecordingRecoveryWorker.enqueue(this@TwinMindApp)
                     resumeStuckSummaries()
+                    startWakeWordIfPrefsOn()
                 } else {
                     android.util.Log.e("TwinMindApp", "Factory STILL not initialized - Hilt setup failed!")
                 }
             }, 100)
+            startWakeWordIfPrefsOn()
             return
         }
         
@@ -59,7 +70,8 @@ class TwinMindApp : Application(), Configuration.Provider {
         initializeWorkManager()
         RecordingRecoveryWorker.enqueue(this)
         resumeStuckSummaries()
-        
+        startWakeWordIfPrefsOn()
+
         android.util.Log.d("TwinMindApp", "=== TwinMindApp.onCreate() END ===")
     }
 
@@ -94,18 +106,17 @@ class TwinMindApp : Application(), Configuration.Provider {
         
         try {
             WorkManager.initialize(this, config)
-            android.util.Log.d("TwinMindApp", "✅✅✅ WorkManager.initialize() SUCCESS!")
+            android.util.Log.d("TwinMindApp", "WorkManager.initialize() SUCCESS!")
             android.util.Log.d("TwinMindApp", "WorkManager now has HiltWorkerFactory configured")
         } catch (e: IllegalStateException) {
             // WorkManager already initialized
-            android.util.Log.e("TwinMindApp", "❌❌❌ WorkManager ALREADY INITIALIZED!")
+            android.util.Log.e("TwinMindApp", "WorkManager ALREADY INITIALIZED!")
             android.util.Log.e("TwinMindApp", "This means getInstance() was called BEFORE onCreate() finished")
             android.util.Log.e("TwinMindApp", "Or WorkManager auto-initialized despite manifest config")
             android.util.Log.e("TwinMindApp", "Error: ${e.message}")
             android.util.Log.e("TwinMindApp", "Stack trace:")
             e.printStackTrace()
             
-            // Try to get the existing instance and check its config
             try {
                 val wm = WorkManager.getInstance(this)
                 android.util.Log.d("TwinMindApp", "Existing WorkManager instance: $wm")
@@ -113,7 +124,7 @@ class TwinMindApp : Application(), Configuration.Provider {
                 android.util.Log.e("TwinMindApp", "Cannot get WorkManager instance: ${ex.message}")
             }
         } catch (e: Exception) {
-            android.util.Log.e("TwinMindApp", "❌ Unexpected error: ${e.message}", e)
+            android.util.Log.e("TwinMindApp", "Unexpected error: ${e.message}", e)
             e.printStackTrace()
         }
     }
@@ -123,7 +134,7 @@ class TwinMindApp : Application(), Configuration.Provider {
             android.util.Log.d("TwinMindApp", "getWorkManagerConfiguration() called - factory ready: ${::workerFactory.isInitialized}")
             
             if (!::workerFactory.isInitialized) {
-                android.util.Log.e("TwinMindApp", "❌ CRITICAL: Factory not ready when Configuration requested!")
+                android.util.Log.e("TwinMindApp", "CRITICAL: Factory not ready when Configuration requested!")
                 android.util.Log.e("TwinMindApp", "WorkManager will initialize WITHOUT factory - workers will fail!")
                 
                 // Return config without factory (this will cause the error)
@@ -139,7 +150,7 @@ class TwinMindApp : Application(), Configuration.Provider {
                     .build()
             }
             
-            android.util.Log.d("TwinMindApp", "✅ Providing Configuration with HiltWorkerFactory")
+            android.util.Log.d("TwinMindApp", "Providing Configuration with HiltWorkerFactory")
             return Configuration.Builder()
                 .setWorkerFactory(workerFactory)
                 .setMinimumLoggingLevel(android.util.Log.DEBUG)

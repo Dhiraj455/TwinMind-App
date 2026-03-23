@@ -42,6 +42,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.twinmind2.data.entity.Summary
 import com.example.twinmind2.recording.RecordingViewModel
+import com.example.twinmind2.ui.components.GeminiMarkdownContent
 import com.example.twinmind2.ui.theme.BackgroundMain
 import com.example.twinmind2.ui.theme.GradientBlueStart
 import com.example.twinmind2.ui.theme.GradientPurpleEnd
@@ -317,13 +318,11 @@ private fun SummarySectionCard(
                         .filter { it.isNotBlank() }
 
                     if (items.isEmpty()) {
-                        Text(
+                        GeminiMarkdownContent(
                             text = content,
+                            textColor = TextPrimary,
                             fontSize = 14.sp,
-                            color = TextPrimary,
-                            lineHeight = 22.sp,
-                            modifier = Modifier.fillMaxWidth(),
-                            softWrap = true
+                            modifier = Modifier.fillMaxWidth()
                         )
                     } else {
                         items.forEach { item ->
@@ -341,28 +340,24 @@ private fun SummarySectionCard(
                                         )
                                 )
                                 Spacer(Modifier.width(10.dp))
-                                Text(
+                                GeminiMarkdownContent(
                                     text = item,
+                                    textColor = TextPrimary,
                                     fontSize = 14.sp,
-                                    color = TextPrimary,
-                                    lineHeight = 22.sp,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .weight(1f),
-                                    softWrap = true
+                                        .weight(1f)
                                 )
                             }
                         }
                     }
                 }
 
-                else -> Text(
+                else -> GeminiMarkdownContent(
                     text = content,
+                    textColor = TextPrimary,
                     fontSize = 14.sp,
-                    color = TextPrimary,
-                    lineHeight = 22.sp,
-                    modifier = Modifier.fillMaxWidth(),
-                    softWrap = true
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }

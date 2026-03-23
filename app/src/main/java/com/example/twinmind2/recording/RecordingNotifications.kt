@@ -17,6 +17,7 @@ object RecordingNotifications {
     const val ACTION_STOP = "com.example.twinmind2.action.STOP"
     const val ACTION_PAUSE = "com.example.twinmind2.action.PAUSE"
     const val ACTION_RESUME = "com.example.twinmind2.action.RESUME"
+    const val ACTION_RECORDING_STOPPED = "com.example.twinmind2.action.RECORDING_STOPPED"
 
     fun ensureChannels(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

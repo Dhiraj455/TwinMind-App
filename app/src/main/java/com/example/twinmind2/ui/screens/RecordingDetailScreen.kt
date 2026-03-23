@@ -51,6 +51,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,16 +61,17 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.withStyle
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.example.twinmind2.chat.ChatViewModel
 import com.example.twinmind2.data.entity.Summary
 import com.example.twinmind2.recording.RecordingViewModel
+import com.example.twinmind2.ui.components.GeminiMarkdownContent
+import com.example.twinmind2.ui.components.geminiResponseToPlainText
 import com.example.twinmind2.ui.theme.BackgroundHome
 import com.example.twinmind2.ui.theme.DividerGray
 import com.example.twinmind2.ui.theme.GradientBlueStart
@@ -82,26 +84,34 @@ import com.example.twinmind2.ui.theme.TextPrimary
 import com.example.twinmind2.ui.theme.TextSecondary
 import com.example.twinmind2.ui.theme.TwinMindDark
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val detailTabs = listOf("Questions", "Notes", "Transcript")
+// "Questions" tab hidden for now — code preserved below, re-add "Questions" to re-enable
+private val detailTabs = listOf(/*"Questions",*/ "Notes", "Transcript")
 private val audioTabLabel = "Audio"
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecordingDetailScreen(sessionId: Long, navController: NavController) {
     val vm: RecordingViewModel = hiltViewModel()
+    val chatVm: ChatViewModel = hiltViewModel()
     val sessions by vm.sessions.collectAsState()
     val session = sessions.firstOrNull { it.id == sessionId }
     val summary by vm.summaryFor(sessionId).collectAsState(initial = null)
     val transcripts by vm.transcriptsFor(sessionId).collectAsState(initial = emptyList())
-    var selectedTab by remember { mutableStateOf("Questions") }
+    var selectedTab by remember { mutableStateOf("Notes") }
     var showMenu by remember { mutableStateOf(false) }
     var isEditingTitle by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var renameTitle by remember { mutableStateOf("") }
+    var showChatSheet by remember { mutableStateOf(false) }
+    var chatSheetInitialQuery by remember { mutableStateOf("") }
+    val chatSheetState = rememberChatSheetState()
     val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
     LaunchedEffect(sessionId) {
@@ -224,21 +234,22 @@ fun RecordingDetailScreen(sessionId: Long, navController: NavController) {
                                     text = { Text("Copy summary") },
                                     onClick = {
                                         val summaryText = buildString {
-                                            summary?.title?.takeIf { it.isNotBlank() }?.let { appendLine(it) }
+                                            summary?.title?.takeIf { it.isNotBlank() }
+                                                ?.let { appendLine(geminiResponseToPlainText(it)) }
                                             summary?.summary?.takeIf { it.isNotBlank() }?.let {
                                                 appendLine()
                                                 appendLine("Summary")
-                                                appendLine(it)
+                                                appendLine(geminiResponseToPlainText(it))
                                             }
                                             summary?.actionItems?.takeIf { it.isNotBlank() }?.let {
                                                 appendLine()
                                                 appendLine("Action Items")
-                                                appendLine(it)
+                                                appendLine(geminiResponseToPlainText(it))
                                             }
                                             summary?.keyPoints?.takeIf { it.isNotBlank() }?.let {
                                                 appendLine()
                                                 appendLine("Key Points")
-                                                appendLine(it)
+                                                appendLine(geminiResponseToPlainText(it))
                                             }
                                         }.ifBlank { "No summary available yet." }
                                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -294,7 +305,7 @@ fun RecordingDetailScreen(sessionId: Long, navController: NavController) {
                         }
                     } else {
                         Text(
-                            text = title,
+                            text = geminiResponseToPlainText(title),
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary,
@@ -372,6 +383,10 @@ fun RecordingDetailScreen(sessionId: Long, navController: NavController) {
                         .clip(RoundedCornerShape(26.dp))
                         .background(Color.White)
                         .border(1.dp, DividerGray, RoundedCornerShape(26.dp))
+                        .clickable {
+                            chatSheetInitialQuery = ""
+                            showChatSheet = true
+                        }
                         .padding(horizontal = 20.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -401,7 +416,13 @@ fun RecordingDetailScreen(sessionId: Long, navController: NavController) {
         ) {
             Spacer(Modifier.height(16.dp))
             when (selectedTab) {
-                "Questions" -> QuestionsTab()
+                // "Questions" tab hidden — uncomment in detailTabs list above to re-enable
+                // "Questions" -> QuestionsTab(
+                //     onQuestionSelected = { question ->
+                //         chatSheetInitialQuery = question
+                //         showChatSheet = true
+                //     }
+                // )
                 "Notes" -> NotesTab(summary = summary, onRegenerate = { vm.generateSummary(sessionId) })
                 "Transcript" -> TranscriptTab(
                     transcripts = transcripts,
@@ -431,6 +452,26 @@ fun RecordingDetailScreen(sessionId: Long, navController: NavController) {
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showChatSheet) {
+        ChatPromptBottomSheet(
+            sheetState = chatSheetState,
+            placeholder = "Ask anything about this recording…",
+            initialText = chatSheetInitialQuery,
+            onDismiss = { showChatSheet = false },
+            onSubmit = { query ->
+                showChatSheet = false
+                scope.launch {
+                    val chatSessionId = chatVm.createSessionAndSendFirstMessage(
+                        query = query,
+                        type = "recording",
+                        recordingSessionId = sessionId
+                    )
+                    navController.navigate("chat/$chatSessionId")
                 }
             }
         )
@@ -536,7 +577,7 @@ private val questionSuggestions = listOf(
 )
 
 @Composable
-private fun QuestionsTab() {
+private fun QuestionsTab(onQuestionSelected: (String) -> Unit = {}) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         questionSuggestions.forEach { (emoji, text) ->
             Row(
@@ -545,7 +586,7 @@ private fun QuestionsTab() {
                     .shadow(2.dp, RoundedCornerShape(14.dp))
                     .clip(RoundedCornerShape(14.dp))
                     .background(Color.White)
-                    .clickable {}
+                    .clickable { onQuestionSelected(text) }
                     .padding(horizontal = 18.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -576,53 +617,53 @@ private fun QuestionsTab() {
 private fun NotesTab(summary: Summary?, onRegenerate: () -> Unit) {
     Column {
         // Share banner
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .shadow(2.dp, RoundedCornerShape(14.dp))
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color(0xFFEFF6FF))
-                .padding(16.dp)
-        ) {
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("✦", fontSize = 16.sp, color = GradientBlueStart)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "Share a link to this summary!",
-                        fontSize = 14.sp,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-                Spacer(Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(TwinMindDark)
-                        .clickable {}
-                        .padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "Share now",
-                        fontSize = 15.sp,
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-        }
+//        Box(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .shadow(2.dp, RoundedCornerShape(14.dp))
+//                .clip(RoundedCornerShape(14.dp))
+//                .background(Color(0xFFEFF6FF))
+//                .padding(16.dp)
+//        ) {
+//            Column {
+//                Row(verticalAlignment = Alignment.CenterVertically) {
+//                    Text("✦", fontSize = 16.sp, color = GradientBlueStart)
+//                    Spacer(Modifier.width(8.dp))
+//                    Text(
+//                        text = "Share a link to this summary!",
+//                        fontSize = 14.sp,
+//                        color = TextPrimary,
+//                        fontWeight = FontWeight.Medium
+//                    )
+//                }
+//                Spacer(Modifier.height(10.dp))
+//                Row(
+//                    modifier = Modifier
+//                        .fillMaxWidth()
+//                        .height(44.dp)
+//                        .clip(RoundedCornerShape(10.dp))
+//                        .background(TwinMindDark)
+//                        .clickable {}
+//                        .padding(horizontal = 16.dp),
+//                    verticalAlignment = Alignment.CenterVertically,
+//                    horizontalArrangement = Arrangement.Center
+//                ) {
+//                    Icon(
+//                        imageVector = Icons.Default.Share,
+//                        contentDescription = null,
+//                        tint = Color.White,
+//                        modifier = Modifier.size(16.dp)
+//                    )
+//                    Spacer(Modifier.width(8.dp))
+//                    Text(
+//                        text = "Share now",
+//                        fontSize = 15.sp,
+//                        color = Color.White,
+//                        fontWeight = FontWeight.SemiBold
+//                    )
+//                }
+//            }
+//        }
 
         Spacer(Modifier.height(16.dp))
         
@@ -726,11 +767,10 @@ private fun SummarySectionsDetail(summaryData: Summary, isGenerating: Boolean) {
 
     // Title as bold heading
     summaryData.title?.ifBlank { null }?.let { titleText ->
-        Text(
+        GeminiMarkdownContent(
             text = titleText,
+            textColor = TextPrimary,
             fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = TextPrimary,
             modifier = Modifier.padding(bottom = 12.dp)
         )
     }
@@ -796,7 +836,11 @@ private fun SummaryDetailCard(
                     .map { it.trim().trimStart('-', '*', '•').trim() }
                     .filter { it.isNotBlank() }
                 if (items.isEmpty()) {
-                    MarkdownBoldText(content)
+                    GeminiMarkdownContent(
+                        text = content,
+                        textColor = TextPrimary,
+                        fontSize = 14.sp
+                    )
                 } else {
                     items.forEach { item ->
                         Row(
@@ -811,46 +855,23 @@ private fun SummaryDetailCard(
                                     .background(Brush.linearGradient(accentGradient))
                             )
                             Spacer(Modifier.width(10.dp))
-                            MarkdownBoldText(
+                            GeminiMarkdownContent(
                                 text = item,
+                                textColor = TextPrimary,
+                                fontSize = 14.sp,
                                 modifier = Modifier.weight(1f)
                             )
                         }
                     }
                 }
             }
-            else -> MarkdownBoldText(content)
+            else -> GeminiMarkdownContent(
+                text = content,
+                textColor = TextPrimary,
+                fontSize = 14.sp
+            )
         }
     }
-}
-
-@Composable
-private fun MarkdownBoldText(
-    text: String,
-    modifier: Modifier = Modifier
-) {
-    val annotated = buildAnnotatedString {
-        val regex = Regex("\\*\\*(.+?)\\*\\*")
-        var cursor = 0
-        regex.findAll(text).forEach { match ->
-            val start = match.range.first
-            val end = match.range.last + 1
-            if (start > cursor) append(text.substring(cursor, start))
-            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                append(match.groupValues[1])
-            }
-            cursor = end
-        }
-        if (cursor < text.length) append(text.substring(cursor))
-    }
-
-    Text(
-        text = annotated,
-        fontSize = 14.sp,
-        color = TextPrimary,
-        lineHeight = 22.sp,
-        modifier = modifier
-    )
 }
 
 // --- Transcript Tab ---

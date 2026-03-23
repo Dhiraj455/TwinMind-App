@@ -31,10 +31,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.Alignment
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Switch
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.DrawerValue
@@ -46,9 +49,11 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -75,16 +80,21 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.twinmind2.chat.ChatViewModel
 import com.example.twinmind2.recording.RecordingNotifications
 import com.example.twinmind2.recording.RecordingService
+import com.example.twinmind2.wakeword.WakeWordPreferences
 import com.example.twinmind2.recording.RecordingViewModel
 import com.example.twinmind2.ui.components.BottomActionButtons
 import com.example.twinmind2.ui.components.ComingUpSection
 import com.example.twinmind2.ui.components.HomeFeatureCards
 import com.example.twinmind2.ui.components.HomeTopBar
+import com.example.twinmind2.ui.screens.ChatPromptBottomSheet
+import com.example.twinmind2.ui.screens.ChatScreen
 import com.example.twinmind2.ui.screens.MemoriesScreen
 import com.example.twinmind2.ui.screens.RecordingDetailScreen
 import com.example.twinmind2.ui.screens.TodoScreen
+import com.example.twinmind2.ui.screens.rememberChatSheetState
 import com.example.twinmind2.ui.theme.TwinMind2Theme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -142,17 +152,26 @@ class MainActivity : ComponentActivity() {
                     backStackEntry.arguments?.getString("sessionId")?.toLongOrNull() ?: 0L
                 RecordingDetailScreen(sessionId = sessionId, navController = navController)
             }
+            composable("chat/{chatSessionId}") { backStackEntry ->
+                val chatSessionId =
+                    backStackEntry.arguments?.getString("chatSessionId")?.toLongOrNull() ?: 0L
+                ChatScreen(chatSessionId = chatSessionId, navController = navController)
+            }
         }
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     private fun HomeScreen(navController: NavController, modifier: Modifier = Modifier) {
         val vm: RecordingViewModel = hiltViewModel()
+        val chatVm: ChatViewModel = hiltViewModel()
         val state = vm.recordingState.collectAsState()
         val scrollState = rememberScrollState()
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
         val scope = rememberCoroutineScope()
         val showStartRecordingDialog = remember { mutableStateOf(false) }
+        var showChatSheet by remember { mutableStateOf(false) }
+        val chatSheetState = rememberChatSheetState()
 
         ModalNavigationDrawer(
             drawerState = drawerState,
@@ -183,47 +202,6 @@ class MainActivity : ComponentActivity() {
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-
-//                        Spacer(Modifier.height(24.dp))
-//                        Box(
-//                            modifier = Modifier
-//                                .fillMaxWidth()
-//                                .height(56.dp)
-//                                .clip(RoundedCornerShape(28.dp))
-//                                .background(Color(0xFFF6F8F9))
-//                        )
-
-//                        Spacer(Modifier.height(20.dp))
-//                        repeat(4) {
-//                            Box(
-//                                modifier = Modifier
-//                                    .fillMaxWidth()
-//                                    .height(22.dp)
-//                                    .clip(RoundedCornerShape(12.dp))
-//                                    .background(Color(0xFFF6F8F9))
-//                            )
-//                            Spacer(Modifier.height(18.dp))
-//                        }
-
-//                        Box(
-//                            modifier = Modifier
-//                                .fillMaxWidth()
-//                                .height(160.dp)
-//                                .clip(RoundedCornerShape(16.dp))
-//                                .background(Color(0xFFF6F8F9))
-//                        )
-
-//                        Spacer(Modifier.height(20.dp))
-//                        repeat(2) {
-//                            Box(
-//                                modifier = Modifier
-//                                    .fillMaxWidth()
-//                                    .height(22.dp)
-//                                    .clip(RoundedCornerShape(12.dp))
-//                                    .background(Color(0xFFF6F8F9))
-//                            )
-//                            Spacer(Modifier.height(18.dp))
-//                        }
                     }
                 }
             }
@@ -258,7 +236,6 @@ class MainActivity : ComponentActivity() {
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Live waveform bars
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(3.dp),
                                     verticalAlignment = Alignment.CenterVertically
@@ -375,82 +352,116 @@ class MainActivity : ComponentActivity() {
 
                     Spacer(Modifier.height(8.dp))
 
-                // Greeting + promo text
-                Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                    Text(
-                        text = buildAnnotatedString {
-                            withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 22.sp, color = TwinMindDark)) {
-                                append("Hey Dhiraj Shelke,\n")
-                            }
-                            withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 22.sp, color = TwinMindDark)) {
-                                append("Welcome to TwinMind")
-                            }
-                        },
-                        lineHeight = 30.sp
-                    )
-//                    Spacer(Modifier.height(4.dp))
-//                    Box(
-//                        modifier = Modifier
-//                            .size(28.dp)
-//                            .clip(CircleShape)
-//                            .border(1.5.dp, DividerGray, CircleShape)
-//                            .clickable {},
-//                        contentAlignment = Alignment.Center
-//                    ) {
-//                        Text(">", fontSize = 14.sp, color = TextSecondary)
-//                    }
-                }
-
-                Spacer(Modifier.height(28.dp))
-
-                // Chat with all your memories button
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .shadow(2.dp, RoundedCornerShape(28.dp))
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(Color.White)
-                        .border(1.dp, DividerGray, RoundedCornerShape(28.dp))
-                        .clickable {}
-                        .padding(horizontal = 20.dp, vertical = 16.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = null,
-                            tint = TwinMindDark,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(10.dp))
+                    Column(modifier = Modifier.padding(horizontal = 20.dp)) {
                         Text(
                             text = buildAnnotatedString {
-                                withStyle(SpanStyle(color = TextSecondary, fontSize = 15.sp)) {
-                                    append("Chat with all ")
+                                withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 22.sp, color = TwinMindDark)) {
+                                    append("Hey Dhiraj Shelke,\n")
                                 }
-                                withStyle(SpanStyle(color = OrangeAccent, fontSize = 15.sp, fontWeight = FontWeight.Medium)) {
-                                    append("your memories")
+                                withStyle(SpanStyle(fontWeight = FontWeight.Bold, fontSize = 22.sp, color = TwinMindDark)) {
+                                    append("Welcome to TwinMind")
                                 }
-                            }
+                            },
+                            lineHeight = 30.sp
                         )
                     }
-                }
 
-                Spacer(Modifier.height(20.dp))
+                    Spacer(Modifier.height(28.dp))
 
-                // Feature cards (To-Do + Notes & Chats)
-                HomeFeatureCards(
-                    onTodoClick = { navController.navigate("todo") },
-                    onMemoriesClick = { navController.navigate("memories") }
-                )
+                    // Chat with all your memories button
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .shadow(2.dp, RoundedCornerShape(28.dp))
+                            .clip(RoundedCornerShape(28.dp))
+                            .background(Color.White)
+                            .border(1.dp, DividerGray, RoundedCornerShape(28.dp))
+                            .clickable { showChatSheet = true }
+                            .padding(horizontal = 20.dp, vertical = 16.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = TwinMindDark,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = buildAnnotatedString {
+                                    withStyle(SpanStyle(color = TextSecondary, fontSize = 15.sp)) {
+                                        append("Chat with all ")
+                                    }
+                                    withStyle(SpanStyle(color = OrangeAccent, fontSize = 15.sp, fontWeight = FontWeight.Medium)) {
+                                        append("your memories")
+                                    }
+                                }
+                            )
+                        }
+                    }
 
-                Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(20.dp))
 
-                // Coming Up
-                ComingUpSection()
+                    // Hey Twin - Voice activation
+                    var wakeWordEnabled by remember { mutableStateOf(WakeWordPreferences.isEnabled(this@MainActivity)) }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .shadow(2.dp, RoundedCornerShape(28.dp))
+                            .clip(RoundedCornerShape(28.dp))
+                            .background(Color.White)
+                            .border(1.dp, DividerGray, RoundedCornerShape(28.dp))
+                            .padding(horizontal = 20.dp, vertical = 16.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Mic,
+                                contentDescription = null,
+                                tint = TwinMindDark,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Hey Twin",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = TwinMindDark
+                                )
+                                Text(
+                                    text = "Say \"Hey Twin Start Recording\" to start",
+                                    fontSize = 12.sp,
+                                    color = TextSecondary
+                                )
+                            }
+                            Switch(
+                                checked = wakeWordEnabled,
+                                onCheckedChange = {
+                                    wakeWordEnabled = it
+                                    WakeWordPreferences.setEnabled(this@MainActivity, it)
+                                }
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(20.dp))
+
+                    HomeFeatureCards(
+                        onTodoClick = { navController.navigate("todo") },
+                        onMemoriesClick = { navController.navigate("memories") }
+                    )
+
+                    Spacer(Modifier.height(24.dp))
+
+                    ComingUpSection()
 
                     Spacer(Modifier.height(80.dp))
                 }
@@ -479,6 +490,28 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        LaunchedEffect(Unit) { RecordingNotifications.ensureChannels(this@MainActivity) }
+        if (showChatSheet) {
+            ChatPromptBottomSheet(
+                sheetState = chatSheetState,
+                placeholder = "Search across all your recorded memories…",
+                onDismiss = { showChatSheet = false },
+                onSubmit = { query ->
+                    showChatSheet = false
+                    scope.launch {
+                        val sessionId = chatVm.createSessionAndSendFirstMessage(
+                            query = query,
+                            type = "all",
+                            recordingSessionId = null
+                        )
+                        navController.navigate("chat/$sessionId")
+                    }
+                }
+            )
+        }
+
+        LaunchedEffect(Unit) {
+            RecordingNotifications.ensureChannels(this@MainActivity)
+            WakeWordPreferences.startIfEnabled(this@MainActivity)
+        }
     }
 }
