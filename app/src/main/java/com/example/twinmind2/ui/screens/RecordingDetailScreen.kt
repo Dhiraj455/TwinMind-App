@@ -427,7 +427,8 @@ fun RecordingDetailScreen(sessionId: Long, navController: NavController) {
                 "Transcript" -> TranscriptTab(
                     transcripts = transcripts,
                     session = session,
-                    context = context
+                    context = context,
+                    onRetryChunk = { vm.retryTranscriptChunk(sessionId, it) }
                 )
                 audioTabLabel -> AudioTab(session = session, context = context)
             }
@@ -880,7 +881,8 @@ private fun SummaryDetailCard(
 private fun TranscriptTab(
     transcripts: List<com.example.twinmind2.data.entity.Transcript>,
     session: com.example.twinmind2.data.entity.RecordingSession?,
-    context: Context
+    context: Context,
+    onRetryChunk: (chunkId: Long) -> Unit = {}
 ) {
     Column {
         if (transcripts.isEmpty()) {
@@ -952,11 +954,29 @@ private fun TranscriptTab(
                             fontSize = 14.sp,
                             color = TextSecondary
                         )
-                        "failed" -> Text(
-                            text = transcript.errorMessage ?: "Transcription failed",
-                            fontSize = 14.sp,
-                            color = StatusError
-                        )
+                        "failed" -> Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = transcript.errorMessage ?: "Transcription failed",
+                                fontSize = 14.sp,
+                                color = StatusError,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick = { onRetryChunk(transcript.chunkId) },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Retry",
+                                    tint = GradientBlueStart,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
                         "completed" -> Text(
                             text = transcript.text,
                             fontSize = 15.sp,

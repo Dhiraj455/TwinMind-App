@@ -28,6 +28,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
@@ -597,6 +598,11 @@ class RecordingService : Service() {
         timerJob?.cancel()
         telephonyManager?.listen(phoneListener, PhoneStateListener.LISTEN_NONE)
         abandonAudioFocus()
+        sessionId?.let { sid ->
+            runBlocking(Dispatchers.IO) {
+                repository.markSessionRecordingEndTime(sid)
+            }
+        }
         repository.clearActive()
         sendBroadcast(Intent(RecordingNotifications.ACTION_RECORDING_STOPPED).setPackage(packageName))
         stopForeground(STOP_FOREGROUND_REMOVE)

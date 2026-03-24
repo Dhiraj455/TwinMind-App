@@ -48,9 +48,6 @@ class TwinMindApp : Application(), Configuration.Provider {
         android.util.Log.d("TwinMindApp", "Checking HiltWorkerFactory: initialized=${::workerFactory.isInitialized}")
         
         if (!::workerFactory.isInitialized) {
-            android.util.Log.e("TwinMindApp", "FATAL: HiltWorkerFactory not initialized!")
-            android.util.Log.e("TwinMindApp", "This means Hilt @Inject failed - check Hilt setup!")
-            // Try again after a brief delay
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                 if (::workerFactory.isInitialized) {
                     android.util.Log.d("TwinMindApp", "Factory now initialized after delay - initializing WorkManager")
@@ -71,8 +68,6 @@ class TwinMindApp : Application(), Configuration.Provider {
         RecordingRecoveryWorker.enqueue(this)
         resumeStuckSummaries()
         startWakeWordIfPrefsOn()
-
-        android.util.Log.d("TwinMindApp", "=== TwinMindApp.onCreate() END ===")
     }
 
     private fun resumeStuckSummaries() {
@@ -107,14 +102,10 @@ class TwinMindApp : Application(), Configuration.Provider {
         try {
             WorkManager.initialize(this, config)
             android.util.Log.d("TwinMindApp", "WorkManager.initialize() SUCCESS!")
-            android.util.Log.d("TwinMindApp", "WorkManager now has HiltWorkerFactory configured")
         } catch (e: IllegalStateException) {
             // WorkManager already initialized
             android.util.Log.e("TwinMindApp", "WorkManager ALREADY INITIALIZED!")
-            android.util.Log.e("TwinMindApp", "This means getInstance() was called BEFORE onCreate() finished")
-            android.util.Log.e("TwinMindApp", "Or WorkManager auto-initialized despite manifest config")
             android.util.Log.e("TwinMindApp", "Error: ${e.message}")
-            android.util.Log.e("TwinMindApp", "Stack trace:")
             e.printStackTrace()
             
             try {
@@ -134,11 +125,6 @@ class TwinMindApp : Application(), Configuration.Provider {
             android.util.Log.d("TwinMindApp", "getWorkManagerConfiguration() called - factory ready: ${::workerFactory.isInitialized}")
             
             if (!::workerFactory.isInitialized) {
-                android.util.Log.e("TwinMindApp", "CRITICAL: Factory not ready when Configuration requested!")
-                android.util.Log.e("TwinMindApp", "WorkManager will initialize WITHOUT factory - workers will fail!")
-                
-                // Return config without factory (this will cause the error)
-                // But also try to initialize later
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     if (::workerFactory.isInitialized) {
                         android.util.Log.d("TwinMindApp", "Factory now ready - but WorkManager already initialized without it")

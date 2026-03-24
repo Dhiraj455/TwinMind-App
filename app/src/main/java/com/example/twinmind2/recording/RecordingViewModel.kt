@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -80,6 +81,24 @@ class RecordingViewModel @Inject constructor(
     fun renameSessionTitle(sessionId: Long, newTitle: String) {
         viewModelScope.launch {
             repository.renameSessionTitle(sessionId, newTitle)
+        }
+    }
+
+    fun retryTranscriptChunk(sessionId: Long, chunkId: Long) {
+        viewModelScope.launch {
+            val chunk = repository.observeChunks(sessionId).first().find { it.id == chunkId } ?: return@launch
+            transcriptionRepository.createPendingTranscript(chunk)
+            transcriptionRepository.transcribeChunk(chunk).fold(
+                onSuccess = { raw ->
+                    val cleaned = runCatching {
+                        transcriptionRepository.contextCorrectTranscript(sessionId, raw).getOrDefault(raw)
+                    }.getOrDefault(raw)
+                    transcriptionRepository.updateTranscriptSuccess(sessionId, chunkId, raw, cleaned)
+                },
+                onFailure = { e ->
+                    transcriptionRepository.updateTranscriptFailure(sessionId, chunkId, e.message ?: "Transcription failed")
+                }
+            )
         }
     }
 

@@ -37,7 +37,20 @@ class RecordingRepository(
 
     suspend fun updateSessionCompleteAudio(sessionId: Long, completeAudioPath: String) {
         val session = dao.getSession(sessionId) ?: return
-        dao.updateSession(session.copy(completeAudioPath = completeAudioPath, status = "stopped", endTimeMs = System.currentTimeMillis()))
+        val endTime = session.endTimeMs ?: System.currentTimeMillis()
+        dao.updateSession(
+            session.copy(completeAudioPath = completeAudioPath, status = "stopped", endTimeMs = endTime)
+        )
+    }
+
+    /**
+     * Persists when recording is stopping (e.g. app removed from recents) so [endTimeMs] is not lost
+     * if the process dies before [updateSessionCompleteAudio] runs. Keeps status active so recovery can still finalize audio.
+     */
+    suspend fun markSessionRecordingEndTime(sessionId: Long, endTimeMs: Long = System.currentTimeMillis()) {
+        val session = dao.getSession(sessionId) ?: return
+        if (session.endTimeMs != null) return
+        dao.updateSession(session.copy(endTimeMs = endTimeMs))
     }
 
     fun observeSessions(): Flow<List<RecordingSession>> = dao.observeSessions()

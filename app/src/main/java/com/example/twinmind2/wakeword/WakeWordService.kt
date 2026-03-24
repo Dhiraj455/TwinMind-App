@@ -1,5 +1,6 @@
 package com.example.twinmind2.wakeword
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -34,10 +35,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.atomic.AtomicLong
 
-/**
- * Foreground service that listens for "Hey Twin Start Recording" and starts RecordingService.
- * Uses Vosk for offline speech recognition.
- */
 class WakeWordService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.IO)
@@ -103,6 +100,7 @@ class WakeWordService : Service() {
         releaseRecognitionResources()
     }
 
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     private fun registerRecordingStoppedReceiver() {
         if (recordingStoppedReceiver != null) return
         recordingStoppedReceiver = object : BroadcastReceiver() {
